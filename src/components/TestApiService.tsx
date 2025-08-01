@@ -52,7 +52,7 @@ export default function TestApiService() {
 
       // Test statistiche
       console.log('📊 Getting stats...');
-      const statistics = await apiService.getStats();
+      const statistics = await apiService.getStatistiche();
       setStats(statistics);
 
       // Test lettura dati campione

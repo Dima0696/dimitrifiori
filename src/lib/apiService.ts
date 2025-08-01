@@ -6,8 +6,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'http://127.0.0.1:54321';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+// Configurazione Supabase - priorità alle variabili di ambiente per il deploy online
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+
+console.log('🔗 Connessione Supabase:', supabaseUrl.includes('127.0.0.1') ? 'LOCALE' : 'ONLINE');
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -54,7 +57,7 @@ export interface Foto {
 
 export interface Imballo {
   id: number;
-  nome: string;
+  quantita: number;
   descrizione?: string;
   created_at: string;
 }
@@ -399,12 +402,248 @@ class ApiService {
     if (error) throw error;
   }
 
+  // ========= ELIMINAZIONE SICURA FATTURE =========
+  
+  /**
+   * Controlla se una fattura può essere eliminata (nessun movimento di vendita)
+   */
+  async verificaEliminabilitaFattura(fattura_acquisto_id: number): Promise<{
+    eliminabile: boolean;
+    motivi: string[];
+    dettagli: any;
+  }> {
+    try {
+      console.log('🔍 Verifica eliminabilità fattura ID:', fattura_acquisto_id);
+      
+      const motivi: string[] = [];
+      const dettagli: any = {};
+      
+      // 1. Verifica movimenti di scarico/vendita dalla tabella movimenti_magazzino
+      const { data: movimentiScarico, error: errorScarico } = await supabase
+        .from('movimenti_magazzino')
+        .select('*')
+        .eq('fattura_id', fattura_acquisto_id)
+        .in('tipo', ['scarico', 'vendita']);
+      
+      if (errorScarico) throw errorScarico;
+      
+      if (movimentiScarico && movimentiScarico.length > 0) {
+        motivi.push(`Trovati ${movimentiScarico.length} movimenti di vendita/scarico`);
+        dettagli.movimentiScarico = movimentiScarico;
+      }
+      
+      // 2. Ottieni info sulla fattura e articoli
+      const { data: documentiCarico, error: errorDoc } = await supabase
+        .from('view_documenti_carico_completi')
+        .select('*')
+        .eq('fattura_acquisto_id', fattura_acquisto_id);
+      
+      if (errorDoc) throw errorDoc;
+      
+      dettagli.documentiCarico = documentiCarico;
+      dettagli.numeroArticoli = documentiCarico?.length || 0;
+      
+      // 3. Calcola giacenze che verranno perse
+      let giacenzeTotali = 0;
+      let valoreTotale = 0;
+      
+      if (documentiCarico) {
+        giacenzeTotali = documentiCarico.reduce((acc: number, doc: any) => acc + (doc.quantita || 0), 0);
+        valoreTotale = documentiCarico.reduce((acc: number, doc: any) => 
+          acc + ((doc.quantita || 0) * (doc.prezzo_acquisto_per_stelo || 0)), 0);
+      }
+      
+      dettagli.giacenzeTotali = giacenzeTotali;
+      dettagli.valoreTotale = valoreTotale;
+      
+      const eliminabile = motivi.length === 0;
+      
+      console.log('✅ Verifica completata:', { eliminabile, motivi, dettagli });
+      
+      return { eliminabile, motivi, dettagli };
+      
+    } catch (error) {
+      console.error('❌ Errore verifica eliminabilità:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Elimina completamente una fattura e tutti i dati correlati
+   */
+  async eliminaFattura(fattura_acquisto_id: number): Promise<void> {
+    try {
+      console.log('🗑️ Inizio eliminazione fattura ID:', fattura_acquisto_id);
+      
+      // Prima verifica se è eliminabile
+      const verifica = await this.verificaEliminabilitaFattura(fattura_acquisto_id);
+      if (!verifica.eliminabile) {
+        throw new Error(`Fattura non eliminabile: ${verifica.motivi.join(', ')}`);
+      }
+      
+      // ELIMINAZIONE IN CASCATA (ordine importante!)
+      
+      // 1. ELIMINA TUTTI i movimenti_dettagliati collegati a questa fattura
+      // Ci sono 3 possibili collegamenti da controllare:
+      
+      console.log('🗑️ Step 1: Eliminazione movimenti_dettagliati diretti...');
+      // A. Elimina quelli collegati direttamente alla fattura
+      const { error: errorDettagliatiDiretti } = await supabase
+        .from('movimenti_dettagliati')
+        .delete()
+        .eq('fattura_acquisto_id', fattura_acquisto_id);
+      
+      if (errorDettagliatiDiretti) throw errorDettagliatiDiretti;
+      
+      console.log('🗑️ Step 2: Eliminazione movimenti_dettagliati via documenti...');
+      // B. Elimina quelli collegati via documenti_carico
+      const { data: documentiCarico } = await supabase
+        .from('documenti_carico')
+        .select('id')
+        .eq('fattura_acquisto_id', fattura_acquisto_id);
+      
+      if (documentiCarico && documentiCarico.length > 0) {
+        const { error: errorDettagliatiDocumenti } = await supabase
+          .from('movimenti_dettagliati')
+          .delete()
+          .in('documento_carico_id', documentiCarico.map(d => d.id));
+        
+        if (errorDettagliatiDocumenti) throw errorDettagliatiDocumenti;
+      }
+      
+      console.log('🗑️ Step 3: Eliminazione movimenti_dettagliati via movimenti...');
+      // C. Elimina quelli collegati via movimenti_magazzino
+      const { data: movimentiMagazzino } = await supabase
+        .from('movimenti_magazzino')
+        .select('id')
+        .eq('fattura_id', fattura_acquisto_id);
+      
+      if (movimentiMagazzino && movimentiMagazzino.length > 0) {
+        // Nota: nella struttura attuale non c'è movimento_id in movimenti_dettagliati
+        // ma lo includo per sicurezza futura
+        console.log('📝 Movimenti magazzino trovati:', movimentiMagazzino.length);
+      }
+      
+      console.log('✅ Tutti i movimenti dettagliati eliminati');
+      
+      // 2. Ora elimina movimenti magazzino
+      const { error: errorMovimenti } = await supabase
+        .from('movimenti_magazzino')
+        .delete()
+        .eq('fattura_id', fattura_acquisto_id);
+      
+      if (errorMovimenti) throw errorMovimenti;
+      console.log('✅ Movimenti magazzino eliminati');
+      
+      // 4. Elimina costi fattura
+      const { error: errorCosti } = await supabase
+        .from('costi_fattura')
+        .delete()
+        .eq('fattura_acquisto_id', fattura_acquisto_id);
+      
+      if (errorCosti) throw errorCosti;
+      console.log('✅ Costi fattura eliminati');
+      
+      // 5. Elimina documenti di carico UNO PER UNO per evitare trigger
+      console.log('🗑️ Eliminazione documenti di carico...');
+      
+      // Ottieni lista documenti da eliminare
+      const { data: documentiDaEliminare } = await supabase
+        .from('documenti_carico')
+        .select('id')
+        .eq('fattura_acquisto_id', fattura_acquisto_id);
+      
+      if (documentiDaEliminare && documentiDaEliminare.length > 0) {
+        console.log(`📦 Eliminazione di ${documentiDaEliminare.length} documenti di carico...`);
+        
+        // Elimina ogni documento individualmente
+        for (const doc of documentiDaEliminare) {
+          try {
+            // Prima elimina eventuali movimenti_dettagliati residui per questo documento
+            await supabase
+              .from('movimenti_dettagliati')
+              .delete()
+              .eq('documento_carico_id', doc.id);
+            
+            // Poi elimina il documento
+            const { error } = await supabase
+              .from('documenti_carico')
+              .delete()
+              .eq('id', doc.id);
+              
+            if (error) {
+              console.error(`❌ Errore eliminazione documento ${doc.id}:`, error);
+              throw error;
+            }
+            console.log(`✅ Documento ${doc.id} eliminato`);
+          } catch (error) {
+            console.error(`❌ Errore grave documento ${doc.id}:`, error);
+            throw error;
+          }
+        }
+      }
+      
+      console.log('✅ Tutti i documenti di carico eliminati');
+      
+      // 6. Elimina fattura principale
+      const { error: errorFattura } = await supabase
+        .from('fatture_acquisto')
+        .delete()
+        .eq('id', fattura_acquisto_id);
+      
+      if (errorFattura) throw errorFattura;
+      console.log('✅ Fattura eliminata completamente');
+      
+      console.log('🎉 Eliminazione fattura completata con successo');
+      
+    } catch (error) {
+      console.error('❌ Errore eliminazione fattura:', error);
+      throw error;
+    }
+  }
+
+  // Upload foto su Supabase Storage
+  async uploadFoto(file: File): Promise<{ foto: Foto; url: string }> {
+    try {
+      // 1. Upload file su Storage
+      const fileName = `${Date.now()}-${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('foto-articoli')
+        .upload(`public/${fileName}`, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Ottieni URL pubblico
+      const { data: urlData } = supabase.storage
+        .from('foto-articoli')
+        .getPublicUrl(`public/${fileName}`);
+
+      // 3. Salva nel database
+      const newFoto = await this.createFoto({
+        nome: file.name.replace(/\.[^/.]+$/, ''), // Rimuove estensione
+        url: urlData.publicUrl,
+        descrizione: `Foto caricata il ${new Date().toLocaleDateString()}`
+      });
+
+      return {
+        foto: newFoto,
+        url: urlData.publicUrl
+      };
+    } catch (error) {
+      console.error('Errore upload foto:', error);
+      throw error;
+    }
+  }
+
   // === IMBALLAGGI ===
   async getImballaggi(): Promise<Imballo[]> {
     const { data, error } = await supabase
       .from('imballaggi')
       .select('*')
-      .order('nome');
+      .order('quantita');
     
     if (error) throw error;
     return data || [];
@@ -819,13 +1058,59 @@ class ApiService {
   // Test connessione database
   async testConnection(): Promise<boolean> {
     try {
+      console.log('🔍 Testing basic Supabase connection...');
+      
+      // Test semplice - prova a leggere qualche record dalla tabella gruppi
       const { data, error } = await supabase
         .from('gruppi')
-        .select('count(*)')
+        .select('id, nome')
         .limit(1);
       
-      return !error;
+      if (error) {
+        console.error('❌ Errore nella query gruppi:', error);
+        console.log('📋 Dettagli errore:', {
+          code: error.code,
+          message: error.message,
+          hint: error.hint
+        });
+        
+        // Se 'gruppi' non esiste, proviamo altre tabelle comuni
+        console.log('🔍 Provando tabella alternativa "groups"...');
+        const { data: data2, error: error2 } = await supabase
+          .from('groups')
+          .select('id, name')
+          .limit(1);
+          
+        if (error2) {
+          console.error('❌ Anche "groups" non funziona:', error2);
+          
+          // Prova a vedere che tabelle ci sono
+          console.log('🔍 Verificando connessione base...');
+          const { data: data3, error: error3 } = await supabase
+            .from('information_schema.tables')
+            .select('table_name')
+            .eq('table_schema', 'public')
+            .limit(10);
+            
+          if (error3) {
+            console.error('❌ Nemmeno information_schema funziona:', error3);
+            return false;
+          }
+          
+          console.log('✅ Connessione OK. Tabelle trovate:', data3);
+          return false; // Connessione OK ma tabelle gruppi/groups mancanti
+        }
+        
+        console.log('✅ Trovata tabella "groups" invece di "gruppi"');
+        console.log('📋 Dati in groups:', data2);
+        return true;
+      }
+      
+      console.log('✅ Tabella "gruppi" trovata');
+      console.log('📋 Dati in gruppi:', data);
+      return true;
     } catch (e) {
+      console.error('❌ Errore generale connessione:', e);
       return false;
     }
   }
@@ -992,45 +1277,54 @@ class ApiService {
     fornitori: number;
     clienti: number;
   }> {
-    const [
-      gruppi,
-      prodotti,
-      colori,
-      provenienze,
-      foto,
-      imballaggi,
-      altezze,
-      qualita,
-      articoli,
-      fornitori,
-      clienti
-    ] = await Promise.all([
-      supabase.from('gruppi').select('count(*)').single(),
-      supabase.from('prodotti').select('count(*)').single(),
-      supabase.from('colori').select('count(*)').single(),
-      supabase.from('provenienze').select('count(*)').single(),
-      supabase.from('foto').select('count(*)').single(),
-      supabase.from('imballaggi').select('count(*)').single(),
-      supabase.from('altezze').select('count(*)').single(),
-      supabase.from('qualita').select('count(*)').single(),
-      supabase.from('articoli').select('count(*)').single(),
-      supabase.from('fornitori').select('count(*)').single(),
-      supabase.from('clienti').select('count(*)').single(),
-    ]);
+    try {
+      // Usa semplici SELECT per contare i record - sintassi corretta per Supabase
+      const [
+        gruppi,
+        prodotti,
+        colori,
+        provenienze,
+        foto,
+        imballaggi,
+        altezze,
+        qualita,
+        articoli,
+        fornitori,
+        clienti
+      ] = await Promise.all([
+        supabase.from('gruppi').select('id'),
+        supabase.from('prodotti').select('id'),
+        supabase.from('colori').select('id'),
+        supabase.from('provenienze').select('id'),
+        supabase.from('foto').select('id'),
+        supabase.from('imballaggi').select('id'),
+        supabase.from('altezze').select('id'),
+        supabase.from('qualita').select('id'),
+        supabase.from('articoli').select('id'),
+        supabase.from('fornitori').select('id'),
+        supabase.from('clienti').select('id'),
+      ]);
 
-    return {
-      gruppi: (gruppi.data as any)?.count || 0,
-      prodotti: (prodotti.data as any)?.count || 0,
-      colori: (colori.data as any)?.count || 0,
-      provenienze: (provenienze.data as any)?.count || 0,
-      foto: (foto.data as any)?.count || 0,
-      imballaggi: (imballaggi.data as any)?.count || 0,
-      altezze: (altezze.data as any)?.count || 0,
-      qualita: (qualita.data as any)?.count || 0,
-      articoli: (articoli.data as any)?.count || 0,
-      fornitori: (fornitori.data as any)?.count || 0,
-      clienti: (clienti.data as any)?.count || 0,
-    };
+      return {
+        gruppi: gruppi.data?.length || 0,
+        prodotti: prodotti.data?.length || 0,
+        colori: colori.data?.length || 0,
+        provenienze: provenienze.data?.length || 0,
+        foto: foto.data?.length || 0,
+        imballaggi: imballaggi.data?.length || 0,
+        altezze: altezze.data?.length || 0,
+        qualita: qualita.data?.length || 0,
+        articoli: articoli.data?.length || 0,
+        fornitori: fornitori.data?.length || 0,
+        clienti: clienti.data?.length || 0,
+      };
+    } catch (error) {
+      console.error('Errore nel caricamento statistiche:', error);
+      return {
+        gruppi: 0, prodotti: 0, colori: 0, provenienze: 0, foto: 0,
+        imballaggi: 0, altezze: 0, qualita: 0, articoli: 0, fornitori: 0, clienti: 0
+      };
+    }
   }
 
   // =========================================================================

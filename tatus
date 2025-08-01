@@ -1,0 +1,5 @@
+[33m049271c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Corretto calcolo imponibile in modifica fattura - calcolo da righe invece che da totale
+[33m77e93fe[m Corretto IVA dal 22% al 10% in InserimentoFattureMultiRiga
+[33m5e1781e[m  PULIZIA APPROFONDITA: Rimossi tutti i file inutilizzati
+[33ma0b2454[m  PULIZIA: Rimossi file obsoleti e duplicati
+[33ma369edb[m 💾 BACKUP: Progetto funzionante senza Cursor - pre-pulizia file obsoleti

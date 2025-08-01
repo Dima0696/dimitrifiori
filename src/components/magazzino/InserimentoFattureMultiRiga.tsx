@@ -34,7 +34,9 @@ import {
   Fade,
   Slide,
   Grow,
-  alpha
+  alpha,
+  Avatar,
+  CircularProgress
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -48,6 +50,7 @@ import {
   Assessment as StatsIcon,
   Edit as EditIcon,
   Visibility as ViewIcon,
+  CloudUpload as CloudUploadIcon,
   FilterList as FilterIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -287,6 +290,18 @@ export default function InserimentoFattureMultiRiga() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [activeTab, setActiveTab] = useState(0);
   
+  // Stati per upload foto
+  const [uploadDialog, setUploadDialog] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  
+  // Stati per eliminazione fattura
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [fatturaToDelete, setFatturaToDelete] = useState<any>(null);
+  const [deleteDetails, setDeleteDetails] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
+  
   const [formData, setFormData] = useState<FatturaCompleta>({
     numero_fattura: '',
     data: new Date().toISOString().split('T')[0],
@@ -430,9 +445,165 @@ export default function InserimentoFattureMultiRiga() {
     });
   };
 
+  // ========= FUNZIONI UPLOAD FOTO =========
+  
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validazione tipo file
+      if (!file.type.startsWith('image/')) {
+        setSnackbar({ open: true, message: 'Seleziona solo file immagine (JPG, PNG, etc.)', severity: 'error' });
+        return;
+      }
+      
+      // Validazione dimensione (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setSnackbar({ open: true, message: 'Il file deve essere inferiore a 5MB', severity: 'error' });
+        return;
+      }
+      
+      setSelectedFile(file);
+      
+      // Crea anteprima
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewUrl(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!selectedFile) return;
+
+    setUploadingPhoto(true);
+    try {
+      console.log('📤 Upload foto in corso...');
+      
+      // Upload tramite apiService
+      const { foto: newFoto } = await apiService.uploadFoto(selectedFile);
+      
+      console.log('✅ Foto caricata:', newFoto);
+      
+      // Aggiorna lista foto
+      const fotoAggiornate = await apiService.getFoto();
+      setFoto(fotoAggiornate);
+      
+      // Auto-seleziona la foto appena caricata nella riga corrente
+      // (assumendo che stiamo lavorando sulla prima riga, puoi modificare la logica)
+      if (formData.righe.length > 0) {
+        updateRiga(0, 'id_foto', newFoto.id);
+      }
+      
+      // Chiudi dialog e resetta
+      setUploadDialog(false);
+      setSelectedFile(null);
+      setPreviewUrl('');
+      
+      setSnackbar({ 
+        open: true, 
+        message: `Foto "${newFoto.nome}" caricata e selezionata con successo!`, 
+        severity: 'success' 
+      });
+      
+    } catch (error) {
+      console.error('❌ Errore upload foto:', error);
+      setSnackbar({ 
+        open: true, 
+        message: 'Errore durante il caricamento della foto', 
+        severity: 'error' 
+      });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const resetUploadDialog = () => {
+    setUploadDialog(false);
+    setSelectedFile(null);
+    setPreviewUrl('');
+  };
+
+  // ========= FUNZIONI ELIMINAZIONE FATTURA =========
+  
+  const handleEliminaFattura = async (fattura: any) => {
+    try {
+      console.log('🗑️ Richiesta eliminazione fattura:', fattura);
+      
+      // Verifica se la fattura può essere eliminata
+      const verifica = await apiService.verificaEliminabilitaFattura(fattura.fattura_acquisto_id);
+      
+      if (!verifica.eliminabile) {
+        setSnackbar({
+          open: true,
+          message: `❌ Impossibile eliminare: ${verifica.motivi.join(', ')}`,
+          severity: 'error'
+        });
+        return;
+      }
+      
+      // Imposta i dati per il dialog di conferma
+      setFatturaToDelete(fattura);
+      setDeleteDetails(verifica.dettagli);
+      setDeleteDialog(true);
+      
+    } catch (error) {
+      console.error('❌ Errore verifica eliminazione:', error);
+      setSnackbar({
+        open: true,
+        message: 'Errore nella verifica di eliminabilità della fattura',
+        severity: 'error'
+      });
+    }
+  };
+
+  const confermaEliminazione = async () => {
+    if (!fatturaToDelete) return;
+    
+    setDeleting(true);
+    try {
+      console.log('🗑️ Conferma eliminazione fattura:', fatturaToDelete.fattura_acquisto_id);
+      
+      await apiService.eliminaFattura(fatturaToDelete.fattura_acquisto_id);
+      
+      setSnackbar({
+        open: true,
+        message: `✅ Fattura "${fatturaToDelete.numero}" eliminata con successo!`,
+        severity: 'success'
+      });
+      
+      // Chiudi dialog e ricarica dati
+      setDeleteDialog(false);
+      setFatturaToDelete(null);
+      setDeleteDetails(null);
+      
+      // Ricarica lista fatture
+      await loadData();
+      
+    } catch (error) {
+      console.error('❌ Errore eliminazione fattura:', error);
+      setSnackbar({
+        open: true,
+        message: 'Errore durante l\'eliminazione della fattura',
+        severity: 'error'
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const annullaEliminazione = () => {
+    setDeleteDialog(false);
+    setFatturaToDelete(null);
+    setDeleteDetails(null);
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
+      console.log('🔄 Caricamento dati anagrafica...');
+      
+      // Carica prima l'anagrafica base (sicura)
       const [
         fornitoriData,
         gruppiData,
@@ -441,8 +612,7 @@ export default function InserimentoFattureMultiRiga() {
         fotoData,
         imballaggiData,
         altezzeData,
-        qualitaData,
-        documentiData  // Documenti carico raw dalla view
+        qualitaData
       ] = await Promise.all([
         apiService.getFornitori(),
         apiService.getGruppi(),
@@ -451,9 +621,20 @@ export default function InserimentoFattureMultiRiga() {
         apiService.getFoto(),
         apiService.getImballaggi(),
         apiService.getAltezze(),
-        apiService.getQualita(),
-        apiService.getDocumentiCarico()  // CORRETTO: carica documenti carico con dati completi
+        apiService.getQualita()
       ]);
+      
+      console.log('✅ Anagrafica caricata, ora carico documenti...');
+      
+      // Carica i documenti separatamente per gestire errori
+      let documentiData = [];
+      try {
+        documentiData = await apiService.getDocumentiCarico();
+        console.log('✅ Documenti caricati:', documentiData.length);
+      } catch (docError) {
+        console.error('❌ Errore caricamento documenti (uso fallback):', docError);
+        documentiData = []; // Fallback: array vuoto
+      }
       
       // Raggruppa documenti per fattura per la visualizzazione
       const fattureRaggruppate = raggruppaDocumentiPerFattura(documentiData);
@@ -824,11 +1005,19 @@ export default function InserimentoFattureMultiRiga() {
       // NUOVO: Carica i costi reali dalla tabella costi_fattura
       const costiReali = await apiService.getCostiFattura(documento.fattura_acquisto_id);
       console.log('💰 Costi reali caricati:', costiReali);
+      console.log('🔍 DEBUG: Numero costi trovati:', costiReali.length);
       
       // Estrai i costi per tipologia
       const costoTrasporto = costiReali.find(c => c.tipo_costo === 'trasporto');
       const costoCommissioni = costiReali.find(c => c.tipo_costo === 'commissioni');
       const costoImballaggi = costiReali.find(c => c.tipo_costo === 'imballaggi');
+      
+      console.log('🚛 Costo Trasporto trovato:', costoTrasporto);
+      console.log('💼 Costo Commissioni trovato:', costoCommissioni);
+      console.log('📦 Costo Imballaggi trovato:', costoImballaggi);
+      
+      // Debug: mostra tutti i tipi di costo disponibili
+      console.log('🔍 Tipi di costo disponibili:', costiReali.map(c => c.tipo_costo));
       
       // Converti documento carico esistente in formato del form
       // Calcola l'imponibile correttamente dalle righe e dai costi invece che dal totale
@@ -911,6 +1100,11 @@ export default function InserimentoFattureMultiRiga() {
       };
       
       console.log('🔄 Fattura convertita con costi reali:', fatturaConvertita);
+      console.log('💰 DEBUG COSTI nel formData:', {
+        costo_trasporto: fatturaConvertita.costo_trasporto,
+        costo_commissioni: fatturaConvertita.costo_commissioni,
+        costo_imballaggi: fatturaConvertita.costo_imballaggi
+      });
       setFormData(fatturaConvertita);
       setOpenDialog(true);
       
@@ -931,8 +1125,75 @@ export default function InserimentoFattureMultiRiga() {
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      // TEMPORANEO: Validazione disabilitata per permettere il salvataggio
-      console.log('⚠️ Validazione temporaneamente disabilitata per debug');
+      // ===== VALIDAZIONE CAMPI OBBLIGATORI =====
+      const erroriValidazione = [];
+
+      // Controllo fornitore
+      if (!formData.id_fornitore || formData.id_fornitore === 0) {
+        erroriValidazione.push('Seleziona un fornitore');
+      }
+
+      // Controllo numero fattura
+      if (!formData.numero_fattura || formData.numero_fattura.trim() === '') {
+        erroriValidazione.push('Inserisci il numero fattura');
+      }
+
+      // Controllo data
+      if (!formData.data) {
+        erroriValidazione.push('Inserisci la data fattura');
+      }
+
+      // Controllo righe
+      if (!formData.righe || formData.righe.length === 0) {
+        erroriValidazione.push('Aggiungi almeno una riga articolo');
+      } else {
+        // Controllo ogni riga
+        formData.righe.forEach((riga, index) => {
+          if (!riga.id_gruppo || riga.id_gruppo === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un gruppo`);
+          }
+          if (!riga.nome_prodotto || riga.nome_prodotto.trim() === '') {
+            erroriValidazione.push(`Riga ${index + 1}: Inserisci il nome prodotto`);
+          }
+          if (!riga.id_colore || riga.id_colore === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un colore`);
+          }
+          if (!riga.id_provenienza || riga.id_provenienza === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona una provenienza`);
+          }
+          if (!riga.id_foto || riga.id_foto === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona una foto`);
+          }
+          if (!riga.id_imballo || riga.id_imballo === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un imballo`);
+          }
+          if (!riga.id_altezza || riga.id_altezza === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un'altezza`);
+          }
+          if (!riga.id_qualita || riga.id_qualita === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona una qualità`);
+          }
+          if (!riga.quantita || riga.quantita <= 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Inserisci una quantità valida`);
+          }
+          if (!riga.prezzo_acquisto_per_stelo || riga.prezzo_acquisto_per_stelo <= 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Inserisci un prezzo di acquisto valido`);
+          }
+        });
+      }
+
+      // Se ci sono errori, mostra e interrompi
+      if (erroriValidazione.length > 0) {
+        setSnackbar({
+          open: true,
+          message: `❌ Compilazione incompleta! Controlla:\n• ${erroriValidazione.slice(0, 3).join('\n• ')}${erroriValidazione.length > 3 ? `\n• ... e altri ${erroriValidazione.length - 3} errori` : ''}`,
+          severity: 'error'
+        });
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Validazione superata, procedo con il salvataggio');
       
       /* 
       // VALIDAZIONE PRELIMINARE: Verifica coerenza quantità e imballi
@@ -1168,10 +1429,60 @@ export default function InserimentoFattureMultiRiga() {
           severity: 'success'
         });
 
+        // SALVATAGGIO COSTI ANALITICI PER NUOVA FATTURA
+        try {
+          if (result && result.fattura_id) {
+            const costiDaSalvare = [];
+            
+            if (formData.costo_trasporto > 0) {
+              costiDaSalvare.push({
+                tipo_costo: 'trasporto' as const,
+                importo: formData.costo_trasporto,
+                fornitore_id: formData.id_fornitore_trasporto || formData.id_fornitore,
+                note: formData.note_costi
+              });
+            }
+            
+            if (formData.costo_commissioni > 0) {
+              costiDaSalvare.push({
+                tipo_costo: 'commissioni' as const,
+                importo: formData.costo_commissioni,
+                fornitore_id: formData.id_fornitore_commissioni || formData.id_fornitore,
+                note: formData.note_costi
+              });
+            }
+            
+            if (formData.costo_imballaggi > 0) {
+              costiDaSalvare.push({
+                tipo_costo: 'imballaggi' as const,
+                importo: formData.costo_imballaggi,
+                fornitore_id: formData.id_fornitore_imballaggi || formData.id_fornitore,
+                note: formData.note_costi
+              });
+            }
+            
+            if (costiDaSalvare.length > 0) {
+              console.log('💰 Salvataggio costi per nuova fattura:', costiDaSalvare);
+              await apiService.aggiornaCostiFattura({
+                fattura_acquisto_id: result.fattura_id,
+                costi: costiDaSalvare
+              });
+              console.log('✅ Costi analitici salvati con successo');
+            }
+          }
+        } catch (costiError) {
+          console.error('⚠️ Errore salvataggio costi:', costiError);
+          setSnackbar({
+            open: true,
+            message: 'Fattura creata ma errore nel salvataggio costi analitici',
+            severity: 'warning'
+          });
+        }
+
         // CREAZIONE AUTOMATICA MOVIMENTI MAGAZZINO
         try {
-          if (result && result.fattura_acquisto_id) {
-            await apiService.updateMovimentiFromFattura(result.fattura_acquisto_id, formData);
+          if (result && result.fattura_id) {
+            await apiService.updateMovimentiFromFattura(result.fattura_id, formData);
             console.log('✅ Movimenti di magazzino creati automaticamente');
           }
         } catch (movError) {
@@ -1370,19 +1681,33 @@ export default function InserimentoFattureMultiRiga() {
         </Grid>
         
         <Grid item xs={12} sm={6} md={4}>
-          <FormControl fullWidth sx={modernStyles.modernInput}>
-            <InputLabel>📷 Foto</InputLabel>
-            <Select
-              value={riga.id_foto}
-              onChange={(e) => updateRiga(index, 'id_foto', Number(e.target.value))}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <FormControl fullWidth sx={modernStyles.modernInput}>
+              <InputLabel>📷 Foto</InputLabel>
+              <Select
+                value={riga.id_foto}
+                onChange={(e) => updateRiga(index, 'id_foto', Number(e.target.value))}
+              >
+                {foto.map((f) => (
+                  <MenuItem key={f.id} value={f.id}>
+                    {f.nome}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button
+              variant="outlined"
+              onClick={() => setUploadDialog(true)}
+              sx={{ 
+                minWidth: 48,
+                height: 56,
+                backgroundColor: 'primary.light',
+                '&:hover': { backgroundColor: 'primary.main', color: 'white' }
+              }}
             >
-              {foto.map((f) => (
-                <MenuItem key={f.id} value={f.id}>
-                  {f.nome}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              <CloudUploadIcon />
+            </Button>
+          </Box>
         </Grid>
         
         <Grid item xs={12} sm={6} md={4}>
@@ -1392,11 +1717,11 @@ export default function InserimentoFattureMultiRiga() {
               value={riga.id_imballo}
               onChange={(e) => updateRiga(index, 'id_imballo', Number(e.target.value))}
             >
-              {imballaggi.map((imballo) => (
-                <MenuItem key={imballo.id} value={imballo.id}>
-                  {imballo.nome}
-                </MenuItem>
-              ))}
+                              {imballaggi.map((imballo) => (
+                  <MenuItem key={imballo.id} value={imballo.id}>
+                    {imballo.quantita}
+                  </MenuItem>
+                ))}
             </Select>
           </FormControl>
         </Grid>
@@ -1456,7 +1781,7 @@ export default function InserimentoFattureMultiRiga() {
             sx={modernStyles.modernInput}
             helperText={
               riga.id_imballo && imballaggi.find(i => i.id === riga.id_imballo) ?
-              `Imballo: ${imballaggi.find(i => i.id === riga.id_imballo)?.nome} (multipli richiesti)` :
+                                `Imballo: ${imballaggi.find(i => i.id === riga.id_imballo)?.quantita} (multipli richiesti)` :
               undefined
             }
           />
@@ -1498,7 +1823,7 @@ export default function InserimentoFattureMultiRiga() {
                     <Box>
                       <Typography variant="caption" color="text.secondary">Imballo</Typography>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {imballaggi.find(i => i.id === riga.id_imballo)?.nome}
+                        {imballaggi.find(i => i.id === riga.id_imballo)?.quantita}
                       </Typography>
                     </Box>
                   )}
@@ -2226,6 +2551,23 @@ export default function InserimentoFattureMultiRiga() {
                           >
                             Modifica
                           </Button>
+                          <Button
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => handleEliminaFattura(fattura)}
+                            sx={{
+                              borderRadius: '12px',
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.875rem',
+                              py: 1,
+                              minWidth: 'auto',
+                              px: 2
+                            }}
+                          >
+                            🗑️
+                          </Button>
                         </Box>
                       </CardContent>
                     </Card>
@@ -2490,6 +2832,193 @@ export default function InserimentoFattureMultiRiga() {
               </Button>
             </DialogActions>
           </motion.div>
+        </Dialog>
+
+        {/* Dialog Upload Foto */}
+        <Dialog 
+          open={uploadDialog} 
+          onClose={resetUploadDialog}
+          maxWidth="sm" 
+          fullWidth
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CloudUploadIcon color="primary" />
+            Carica Nuova Foto
+          </DialogTitle>
+          
+          <DialogContent>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
+              
+              {/* Area upload file */}
+              <Box>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                  id="photo-upload-input"
+                />
+                <label htmlFor="photo-upload-input">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<CloudUploadIcon />}
+                    fullWidth
+                    sx={{ 
+                      height: 60,
+                      borderStyle: 'dashed',
+                      '&:hover': { borderStyle: 'dashed' }
+                    }}
+                  >
+                    Clicca per selezionare un'immagine
+                  </Button>
+                </label>
+              </Box>
+
+              {/* Anteprima foto */}
+              {previewUrl && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Anteprima:
+                  </Typography>
+                  <Avatar
+                    src={previewUrl}
+                    sx={{ 
+                      width: 120, 
+                      height: 120,
+                      border: '2px solid',
+                      borderColor: 'primary.main'
+                    }}
+                  />
+                  {selectedFile && (
+                    <Typography variant="caption" color="text.secondary">
+                      {selectedFile.name} • {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+              {/* Info validazione */}
+              <Alert severity="info" sx={{ fontSize: '0.875rem' }}>
+                • Formati supportati: JPG, PNG, GIF, WebP<br/>
+                • Dimensione massima: 5MB<br/>
+                • La foto sarà automaticamente selezionata dopo il caricamento
+              </Alert>
+            </Box>
+          </DialogContent>
+          
+          <DialogActions sx={{ px: 3, pb: 3 }}>
+            <Button 
+              onClick={resetUploadDialog}
+              disabled={uploadingPhoto}
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={handleUploadPhoto}
+              variant="contained"
+              disabled={!selectedFile || uploadingPhoto}
+              startIcon={uploadingPhoto ? <CircularProgress size={16} /> : <CloudUploadIcon />}
+            >
+              {uploadingPhoto ? 'Caricamento...' : 'Carica Foto'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog Conferma Eliminazione Fattura */}
+        <Dialog 
+          open={deleteDialog} 
+          onClose={annullaEliminazione}
+          maxWidth="sm" 
+          fullWidth
+        >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            bgcolor: '#fff3e0',
+            color: '#e65100'
+          }}>
+            ⚠️ Conferma Eliminazione Fattura
+          </DialogTitle>
+          
+          <DialogContent sx={{ pt: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              
+              {/* Info fattura */}
+              {fatturaToDelete && (
+                <Alert severity="warning" sx={{ fontSize: '0.875rem' }}>
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    📋 Fattura: <strong>{fatturaToDelete.numero}</strong>
+                  </Typography>
+                  <Typography variant="body2">
+                    📅 Data: {fatturaToDelete.data_fattura ? 
+                      new Date(fatturaToDelete.data_fattura).toLocaleDateString('it-IT') : 'N/A'}
+                  </Typography>
+                  <Typography variant="body2">
+                    🏢 Fornitore: {fatturaToDelete.fornitore_nome || 'N/A'}
+                  </Typography>
+                </Alert>
+              )}
+
+              {/* Dettagli eliminazione */}
+              {deleteDetails && (
+                <Box sx={{ bgcolor: '#fafafa', p: 2, borderRadius: 2 }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: '#d32f2f' }}>
+                    🗑️ Cosa verrà eliminato:
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography variant="body2">
+                      📦 <strong>{deleteDetails.numeroArticoli}</strong> articoli/documenti di carico
+                    </Typography>
+                    <Typography variant="body2">
+                      📊 <strong>{deleteDetails.giacenzeTotali}</strong> steli totali in giacenza
+                    </Typography>
+                    <Typography variant="body2">
+                      💰 Valore giacenze: <strong>€{deleteDetails.valoreTotale?.toFixed(2) || '0.00'}</strong>
+                    </Typography>
+                    <Typography variant="body2">
+                      🏷️ Tutti i costi analitici associati
+                    </Typography>
+                    <Typography variant="body2">
+                      📈 Tutti i movimenti di magazzino correlati
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Avvertimento */}
+              <Alert severity="error" sx={{ fontSize: '0.875rem' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  ⚠️ ATTENZIONE: Questa azione è IRREVERSIBILE!
+                </Typography>
+                <Typography variant="body2">
+                  Le giacenze verranno completamente rimosse dal magazzino.
+                  Assicurati che non ci siano vendite o movimenti in corso.
+                </Typography>
+              </Alert>
+            </Box>
+          </DialogContent>
+          
+          <DialogActions sx={{ px: 3, pb: 3 }}>
+            <Button 
+              onClick={annullaEliminazione}
+              variant="outlined"
+              disabled={deleting}
+            >
+              Annulla
+            </Button>
+            <Button 
+              onClick={confermaEliminazione}
+              variant="contained"
+              color="error"
+              disabled={deleting}
+              startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            >
+              {deleting ? 'Eliminazione...' : 'Conferma Eliminazione'}
+            </Button>
+          </DialogActions>
         </Dialog>
 
         <Snackbar

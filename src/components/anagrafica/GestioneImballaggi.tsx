@@ -13,7 +13,7 @@ import { apiService } from '../../lib/apiService';
 
 interface Imballo {
   id: number;
-  nome: string;
+  quantita: number;
   descrizione?: string;
   created_at: string;
 }
@@ -23,7 +23,7 @@ export default function GestioneImballaggi() {
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingImballo, setEditingImballo] = useState<Imballo | null>(null);
-  const [formData, setFormData] = useState({ nome: '', descrizione: '' });
+  const [formData, setFormData] = useState({ quantita: '', descrizione: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   // Carica gli imballaggi
@@ -47,7 +47,7 @@ export default function GestioneImballaggi() {
   // Apri dialog per nuovo imballo
   const handleAddImballo = () => {
     setEditingImballo(null);
-    setFormData({ nome: '', descrizione: '' });
+    setFormData({ quantita: '', descrizione: '' });
     setOpenDialog(true);
   };
 
@@ -55,7 +55,7 @@ export default function GestioneImballaggi() {
   const handleEditImballo = (imballo: Imballo) => {
     setEditingImballo(imballo);
     setFormData({ 
-      nome: imballo.nome, 
+      quantita: imballo.quantita.toString(), 
       descrizione: imballo.descrizione || '' 
     });
     setOpenDialog(true);
@@ -63,14 +63,15 @@ export default function GestioneImballaggi() {
 
   // Salva imballo (nuovo o modifica)
   const handleSaveImballo = async () => {
-    if (!formData.nome.trim()) {
-      setSnackbar({ open: true, message: 'Il nome dell\'imballo è obbligatorio', severity: 'error' });
+    const quantitaNum = parseInt(formData.quantita);
+    if (!formData.quantita.trim() || isNaN(quantitaNum) || quantitaNum <= 0) {
+      setSnackbar({ open: true, message: 'Inserisci una quantità valida (numero positivo)', severity: 'error' });
       return;
     }
 
     try {
       const dataToSave = {
-        nome: formData.nome,
+        quantita: quantitaNum,
         descrizione: formData.descrizione.trim() || undefined
       };
 
@@ -105,15 +106,14 @@ export default function GestioneImballaggi() {
     }
   };
 
-  // Ottieni colore chip per tipo di imballo
-  const getPackageColor = (name: string) => {
-    const nameUpper = name.toUpperCase();
-    if (nameUpper.includes('MAZZO') || nameUpper.includes('BOUQUET')) return 'success';
-    if (nameUpper.includes('CASSA') || nameUpper.includes('BOX')) return 'primary';
-    if (nameUpper.includes('SECCHIO') || nameUpper.includes('BUCKET')) return 'warning';
-    if (nameUpper.includes('VASO') || nameUpper.includes('POT')) return 'secondary';
-    if (nameUpper.includes('SCATOLA') || nameUpper.includes('CONFEZIONE')) return 'info';
-    return 'default';
+  // Ottieni colore chip per quantità imballo
+  const getPackageColor = (quantita: number) => {
+    if (quantita === 1) return 'success';      // Singolo stelo - verde
+    if (quantita <= 5) return 'info';          // Piccoli mazzi - blu
+    if (quantita <= 10) return 'warning';      // Mazzi medi - arancione  
+    if (quantita <= 25) return 'primary';      // Mazzi grandi - azzurro
+    if (quantita <= 50) return 'secondary';    // Cassette - viola
+    return 'error';                            // Grandi quantità - rosso
   };
 
   return (
@@ -138,7 +138,7 @@ export default function GestioneImballaggi() {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Icona</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Nome</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Quantità</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Descrizione</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Creato</TableCell>
                 <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>Azioni</TableCell>
@@ -170,8 +170,8 @@ export default function GestioneImballaggi() {
                     </TableCell>
                     <TableCell>
                       <Chip 
-                        label={imballo.nome}
-                        color={getPackageColor(imballo.nome)}
+                        label={`${imballo.quantita} steli`}
+                        color={getPackageColor(imballo.quantita)}
                         icon={<InventoryIcon />}
                         size="small"
                       />
@@ -218,12 +218,15 @@ export default function GestioneImballaggi() {
         <DialogContent>
           <TextField
             fullWidth
-            label="Nome Imballo"
-            value={formData.nome}
-            onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+            label="Quantità Steli"
+            type="number"
+            value={formData.quantita}
+            onChange={(e) => setFormData({ ...formData, quantita: e.target.value })}
             margin="normal"
             required
-            placeholder="es. Mazzo, Cassa, Secchio"
+            placeholder="es. 1, 5, 10, 20, 50"
+            inputProps={{ min: 1, step: 1 }}
+            helperText="Numero di steli per imballo"
           />
           <TextField
             fullWidth
