@@ -292,7 +292,7 @@ export default function InserimentoFattureMultiRiga() {
     data: new Date().toISOString().split('T')[0],
     id_fornitore: 0,
     imponibile: 0,
-    iva: 22,
+    iva: 10,
     totale: 0,
     stato: 'bozza',
     note: '',
@@ -767,7 +767,7 @@ export default function InserimentoFattureMultiRiga() {
       data: new Date().toISOString().split('T')[0],
       id_fornitore: 0,
       imponibile: 0,
-      iva: 22,
+      iva: 10,
       totale: 0,
       stato: 'bozza',
       note: '',
@@ -835,8 +835,8 @@ export default function InserimentoFattureMultiRiga() {
         numero_fattura: documento.numero || '',
         data: documento.data_fattura || new Date().toISOString().split('T')[0],
         id_fornitore: documento.fornitore_id || 0,
-        imponibile: (documento.totale_fattura || 0) / 1.22, // Calcola imponibile dal totale
-        iva: 22,
+        imponibile: (documento.totale_fattura || 0) / 1.10, // Calcola imponibile dal totale
+        iva: 10,
         totale: documento.totale_fattura || 0,
         stato: documento.stato_fattura || 'bozza',
         note: documento.note_fattura || '',
