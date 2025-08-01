@@ -831,13 +831,22 @@ export default function InserimentoFattureMultiRiga() {
       const costoImballaggi = costiReali.find(c => c.tipo_costo === 'imballaggi');
       
       // Converti documento carico esistente in formato del form
+      // Calcola l'imponibile correttamente dalle righe e dai costi invece che dal totale
+      const totaleRighe = articoliDellaFattura.reduce((acc: number, art: any) => {
+        return acc + ((art.quantita || 0) * (art.prezzo_acquisto_per_stelo || 0));
+      }, 0);
+      
+      const costiAnalitici = (costoTrasporto?.importo || 0) + (costoCommissioni?.importo || 0) + (costoImballaggi?.importo || 0);
+      const imponibileCalcolato = totaleRighe + costiAnalitici;
+      const totaleCalcolato = imponibileCalcolato + (imponibileCalcolato * 10 / 100);
+      
       const fatturaConvertita: FatturaCompleta = {
         numero_fattura: documento.numero || '',
         data: documento.data_fattura || new Date().toISOString().split('T')[0],
         id_fornitore: documento.fornitore_id || 0,
-        imponibile: (documento.totale_fattura || 0) / 1.10, // Calcola imponibile dal totale
+        imponibile: imponibileCalcolato,
         iva: 10,
-        totale: documento.totale_fattura || 0,
+        totale: totaleCalcolato,
         stato: documento.stato_fattura || 'bozza',
         note: documento.note_fattura || '',
         
