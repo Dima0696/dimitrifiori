@@ -22,6 +22,7 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import ShoppingBasketIcon from '@mui/icons-material/ShoppingBasket';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: boolean, onDrawerToggle?: () => void }) {
@@ -39,6 +40,7 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
     { label: 'Gestione Vendite', icon: <PointOfSaleIcon />, path: '/vendite' },
     { label: 'Gestione Fornitori', icon: <BusinessIcon />, path: '/fornitori' },
     { label: 'Lista Clienti', icon: <PeopleIcon />, path: '/clienti' },
+    { label: 'Anagrafica', icon: <SettingsIcon />, path: '/anagrafica' },
     { label: 'Statistiche', icon: <AnalyticsIcon />, path: '/statistiche' },
     { label: 'Contabilità', icon: <AccountBalanceIcon />, path: '/contabilita' },
     { label: 'Gestione Immagini', icon: <PictureAsPdfIcon />, path: '/download-immagini' },
@@ -53,68 +55,68 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
   ];
 
   const drawerContent = (
-    <Box sx={{ height: '100%', bgcolor: '#23283B', color: '#fff', display: 'flex', flexDirection: 'column', p: 0 }}>
+    <Box sx={{ height: '100%', bgcolor: '#ffffff', color: '#333333', display: 'flex', flexDirection: 'column', p: 0, borderRight: '1px solid #e0e0e0' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', p: 3, pb: 2, gap: 2 }}>
-        {/* Logo flat senza giallo */}
-        <Box sx={{ width: 40, height: 40, bgcolor: '#fff', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Typography variant="h5" fontWeight={900} color="#23283B">DF</Typography>
+        {/* Logo moderno */}
+        <Box sx={{ width: 40, height: 40, bgcolor: '#2196F3', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography variant="h5" fontWeight={900} color="#fff">DF</Typography>
         </Box>
-        <Typography variant="h6" fontWeight={700} color="#fff">DimitriFlor</Typography>
+        <Typography variant="h6" fontWeight={700} color="#333333">DimitriFlor</Typography>
       </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', px: 3, pb: 2 }}>
-        <Avatar sx={{ bgcolor: '#B0B3C6', color: '#23283B', width: 40, height: 40, fontWeight: 700 }}>P</Avatar>
+        <Avatar sx={{ bgcolor: '#2196F3', color: '#fff', width: 40, height: 40, fontWeight: 700 }}>P</Avatar>
         <Box sx={{ ml: 2 }}>
-          <Typography variant="body1" fontWeight={600}>Paolo Melone</Typography>
-          <Typography variant="caption" color="#B0B3C6">Amministratore</Typography>
+          <Typography variant="body1" fontWeight={600} color="#333333">Paolo Melone</Typography>
+          <Typography variant="caption" color="#666666">Amministratore</Typography>
         </Box>
       </Box>
-      <Divider sx={{ bgcolor: '#353B50', my: 2 }} />
+      <Divider sx={{ bgcolor: '#e0e0e0', my: 2 }} />
       <List sx={{ flex: 1, mt: 2 }}>
         {menuItems.map((item) => (
           <ListItem disablePadding key={item.label} sx={{ mb: 0.5 }}>
             <ListItemButton
               sx={{
-                color: location.pathname === item.path ? '#fff' : '#B0B3C6',
-                borderRadius: 3,
+                color: location.pathname === item.path ? '#2196F3' : '#666666',
+                borderRadius: 2,
                 mx: 2,
                 minHeight: 52,
                 px: 2.5,
-                bgcolor: location.pathname === item.path ? '#292F45' : 'transparent',
-                fontWeight: location.pathname === item.path ? 700 : 500,
-                '&:hover': { bgcolor: '#2C3147', color: '#fff' },
-                transition: 'all 0.15s',
+                bgcolor: location.pathname === item.path ? '#f3f7ff' : 'transparent',
+                fontWeight: location.pathname === item.path ? 600 : 500,
+                '&:hover': { bgcolor: '#f5f5f5', color: '#333333' },
+                transition: 'all 0.2s ease',
               }}
               selected={location.pathname === item.path}
               onClick={() => navigate(item.path)}
             >
-              <ListItemIcon sx={{ color: location.pathname === item.path ? '#fff' : '#B0B3C6', minWidth: 36 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 700 : 500 }} />
+              <ListItemIcon sx={{ color: location.pathname === item.path ? '#2196F3' : '#666666', minWidth: 36 }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 600 : 500 }} />
             </ListItemButton>
           </ListItem>
         ))}
 
-        <Divider sx={{ bgcolor: '#353B50', my: 2 }} />
+        <Divider sx={{ bgcolor: '#e0e0e0', my: 2 }} />
 
         {/* Sezione Ordini */}
         <ListItem disablePadding sx={{ mb: 0.5 }}>
           <ListItemButton
             onClick={() => setOpenOrdini(!openOrdini)}
             sx={{
-              color: '#B0B3C6',
-              borderRadius: 3,
+              color: '#666666',
+              borderRadius: 2,
               mx: 2,
               minHeight: 52,
               px: 2.5,
               bgcolor: 'transparent',
-              fontWeight: 700,
-              '&:hover': { bgcolor: '#2C3147', color: '#fff' },
-              transition: 'all 0.15s',
+              fontWeight: 600,
+              '&:hover': { bgcolor: '#f5f5f5', color: '#333333' },
+              transition: 'all 0.2s ease',
             }}
           >
-            <ListItemIcon sx={{ color: '#B0B3C6', minWidth: 36 }}>
+            <ListItemIcon sx={{ color: '#666666', minWidth: 36 }}>
               <AssignmentIcon />
             </ListItemIcon>
-            <ListItemText primary="Ordini" primaryTypographyProps={{ fontWeight: 700 }} />
+            <ListItemText primary="Ordini" primaryTypographyProps={{ fontWeight: 600 }} />
             {openOrdini ? <ExpandLess /> : <ExpandMore />}
           </ListItemButton>
         </ListItem>
@@ -125,22 +127,22 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
               <ListItem disablePadding key={item.label} sx={{ mb: 0.5 }}>
                 <ListItemButton
                   sx={{
-                    color: location.pathname === item.path ? '#fff' : '#B0B3C6',
-                    borderRadius: 3,
+                    color: location.pathname === item.path ? '#2196F3' : '#666666',
+                    borderRadius: 2,
                     mx: 2,
                     ml: 4,
                     minHeight: 52,
                     px: 2.5,
-                    bgcolor: location.pathname === item.path ? '#292F45' : 'transparent',
-                    fontWeight: location.pathname === item.path ? 700 : 500,
-                    '&:hover': { bgcolor: '#2C3147', color: '#fff' },
-                    transition: 'all 0.15s',
+                    bgcolor: location.pathname === item.path ? '#f3f7ff' : 'transparent',
+                    fontWeight: location.pathname === item.path ? 600 : 500,
+                    '&:hover': { bgcolor: '#f5f5f5', color: '#333333' },
+                    transition: 'all 0.2s ease',
                   }}
                   selected={location.pathname === item.path}
                   onClick={() => navigate(item.path)}
                 >
-                  <ListItemIcon sx={{ color: location.pathname === item.path ? '#fff' : '#B0B3C6', minWidth: 36 }}>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 700 : 500 }} />
+                  <ListItemIcon sx={{ color: location.pathname === item.path ? '#2196F3' : '#666666', minWidth: 36 }}>{item.icon}</ListItemIcon>
+                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 600 : 500 }} />
                 </ListItemButton>
               </ListItem>
             ))}
@@ -148,7 +150,7 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
         </Collapse>
       </List>
       <Box sx={{ p: 3, pt: 0 }}>
-        <Typography variant="caption" color="#B0B3C6">© 2024 DimitriFlor</Typography>
+        <Typography variant="caption" color="#999999">© 2024 DimitriFlor</Typography>
       </Box>
     </Box>
   );
@@ -160,7 +162,7 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
       onClose={onDrawerToggle}
       ModalProps={{ keepMounted: true }}
       sx={{
-        '& .MuiDrawer-paper': { width: 260, boxSizing: 'border-box', bgcolor: '#23283B' },
+        '& .MuiDrawer-paper': { width: 260, boxSizing: 'border-box', bgcolor: '#ffffff', borderRight: '1px solid #e0e0e0' },
       }}
     >
       {drawerContent}
@@ -172,7 +174,7 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
       sx={{
         width: 260,
         flexShrink: 0,
-        '& .MuiDrawer-paper': { width: 260, boxSizing: 'border-box', bgcolor: '#23283B' },
+        '& .MuiDrawer-paper': { width: 260, boxSizing: 'border-box', bgcolor: '#ffffff', borderRight: '1px solid #e0e0e0' },
       }}
     >
       {drawerContent}

@@ -8,7 +8,7 @@ import {
   TrendingUp, TrendingDown, AttachMoney, ShoppingCart, 
   Inventory, Business, LocalShipping, Warning
 } from '@mui/icons-material';
-import { apiService } from '../lib/apiService';
+import apiService from '../lib/apiService';
 import { useMagazzinoEvent, useMagazzinoEmitter } from '../lib/magazzinoEvents';
 
 export default function Dashboard() {
@@ -17,7 +17,16 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
   // Dati dashboard
-  const [statistiche, setStatistiche] = useState({
+  const [statistiche, setStatistiche] = useState<{
+    fatture_acquisto: { totale: number; importo: number };
+    fatture_vendita: { totale: number; importo: number };
+    giacenze: { varietà: number; valore: number; scorta_minima: number };
+    fornitori: { attivi: number; pagamenti_pendenti: number };
+    clienti: { attivi: number; fatture_pendenti: number };
+    movimenti_recenti: any[];
+    fatture_recenti: any[];
+    alert_sistema: { tipo: string; messaggio: string; azione: string }[];
+  }>({
     fatture_acquisto: { totale: 0, importo: 0 },
     fatture_vendita: { totale: 0, importo: 0 },
     giacenze: { varietà: 0, valore: 0, scorta_minima: 0 },
@@ -85,7 +94,7 @@ export default function Dashboard() {
       ] = await Promise.all([
         apiService.getFatture('acquisto'),
         apiService.getFatture('vendita'),
-        apiService.getGiacenze(),
+        apiService.getLottiMagazzino(),
         apiService.getFornitori(),
         apiService.getClienti(),
         apiService.getMovimentiMagazzino(),
@@ -113,19 +122,21 @@ export default function Dashboard() {
       };
 
       const stats_fornitori = {
-        attivi: statisticheFornitoriDettagliato.totali.fornitori_attivi,
-        pagamenti_pendenti: statisticheFornitoriDettagliato.fornitori.reduce((sum: number, f: any) => 
-          sum + f.statistiche.fatture_da_pagare, 0),
-        importo_da_pagare: statisticheFornitoriDettagliato.totali.da_pagare_totale,
-        importo_scaduto: statisticheFornitoriDettagliato.totali.scaduto_totale
+        attivi: statisticheFornitoriDettagliato.length,
+        pagamenti_pendenti: statisticheFornitoriDettagliato.reduce((sum: number, f: any) => 
+          sum + (f.fatture_pendenti || 0), 0),
+        importo_da_pagare: statisticheFornitoriDettagliato.reduce((sum: number, f: any) => 
+          sum + (f.totale_importo || 0), 0),
+        importo_scaduto: 0 // TODO: implementare logica scadenze
       };
 
       const stats_clienti = {
-        attivi: statisticheClientiDettagliato.totali.clienti_attivi,
-        fatture_pendenti: statisticheClientiDettagliato.clienti.reduce((sum: number, c: any) => 
-          sum + c.statistiche.fatture_da_incassare, 0),
-        importo_da_incassare: statisticheClientiDettagliato.totali.da_incassare_totale,
-        importo_scaduto: statisticheClientiDettagliato.totali.scaduto_totale
+        attivi: statisticheClientiDettagliato.length,
+        fatture_pendenti: statisticheClientiDettagliato.reduce((sum: number, c: any) => 
+          sum + (c.fatture_pendenti || 0), 0),
+        importo_da_incassare: statisticheClientiDettagliato.reduce((sum: number, c: any) => 
+          sum + (c.totale_importo || 0), 0),
+        importo_scaduto: 0 // TODO: implementare logica scadenze
       };
 
       // Movimenti e fatture recenti (ultimi 10)

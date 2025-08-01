@@ -5,21 +5,19 @@ import { CssBaseline } from '@mui/material';
 import Login from './pages/Login';
 import { AuthProvider } from './auth';
 import ProtectedRoute from './ProtectedRoute';
-import ListaClienti from './components/ListaClienti';
+
 import Webshop from './pages/Webshop';
 import Dashboard from './components/Dashboard';
 import MainLayout from './components/MainLayout';
 import GestioneFornitori from './components/anagrafica/GestioneFornitori';
-import ImageUploader from './components/ImageDownloader';
+
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GestioneMagazzino from './components/GestioneMagazzino';
 import TestApiService from './components/TestApiService';
 import Anagrafica from './components/Anagrafica';
 import modernTheme from './styles/modernTheme';
 
-function Clienti() {
-  return <MainLayout title="Clienti"><ListaClienti /></MainLayout>;
-}
+
 
 function Magazzino() {
   return <MainLayout title="Magazzino"><GestioneMagazzino /></MainLayout>;
@@ -49,11 +47,7 @@ function App() {
                 {/* Fornitori */}
                 <Route path="/fornitori" element={<ProtectedRoute><MainLayout title="Gestione Fornitori"><GestioneFornitori /></MainLayout></ProtectedRoute>} />
                 
-                {/* Clienti (mantenuto) */}
-                <Route path="/clienti" element={<ProtectedRoute><Clienti /></ProtectedRoute>} />
                 
-                {/* Gestione Immagini (utility) */}
-                <Route path="/download-immagini" element={<ProtectedRoute><MainLayout title="Gestione Immagini"><ImageUploader /></MainLayout></ProtectedRoute>} />
                 
                 {/* Test API */}
                 <Route path="/test-api" element={<ProtectedRoute><MainLayout title="Test API Service"><TestApiService /></MainLayout></ProtectedRoute>} />
@@ -69,3 +63,6 @@ function App() {
 }
 
 export default App;
+
+
+

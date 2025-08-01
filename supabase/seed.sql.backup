@@ -1,0 +1,109 @@
+-- =============================================================================
+-- DATI DI ESEMPIO - GESTIONALE FIORI
+-- =============================================================================
+
+-- Inserimento gruppi
+INSERT INTO gruppi (nome, descrizione) VALUES
+('Rose', 'Rose di vari tipi e colori'),
+('Tulipani', 'Tulipani stagionali'),
+('Garofani', 'Garofani standard e spray'),
+('Gerbere', 'Gerbere colorate'),
+('Girasoli', 'Girasoli standard');
+
+-- Inserimento colori
+INSERT INTO colori (nome) VALUES
+('Rosso'), ('Bianco'), ('Rosa'), ('Giallo'), 
+('Arancione'), ('Viola'), ('Blu'), ('Verde'), 
+('Fucsia'), ('Bordeaux'), ('Crema'), ('Misto');
+
+-- Inserimento altezze
+INSERT INTO altezze (nome) VALUES
+('40-50cm'), ('50-60cm'), ('60-70cm'), 
+('70-80cm'), ('80-90cm'), ('90-100cm'), ('100cm+');
+
+-- Inserimento qualità
+INSERT INTO qualita (nome) VALUES
+('Prima scelta'), ('Seconda scelta'), ('Standard'), ('Premium');
+
+-- Inserimento provenienze
+INSERT INTO provenienze (nome) VALUES
+('Olanda'), ('Italia'), ('Ecuador'), ('Kenya'), 
+('Colombia'), ('Etiopia'), ('Francia'), ('Germania');
+
+-- Inserimento prodotti
+INSERT INTO prodotti (nome, gruppo_id) VALUES
+-- Rose
+('Rosa Standard', 1),
+('Rosa Spray', 1),
+('Rosa Inglese', 1),
+-- Tulipani  
+('Tulipano Singolo', 2),
+('Tulipano Doppio', 2),
+-- Garofani
+('Garofano Standard', 3),
+('Garofano Spray', 3),
+-- Gerbere
+('Gerbera Standard', 4),
+('Gerbera Mini', 4),
+-- Girasoli
+('Girasole Standard', 5);
+
+-- Inserimento fornitori
+INSERT INTO fornitori (nome, ragione_sociale, citta, telefono, email) VALUES
+('FloraHolland', 'FloraHolland B.V.', 'Aalsmeer', '+31-297-393939', 'info@floraholland.com'),
+('Floricoltura Italiana', 'Floricoltura Italiana S.r.l.', 'Sanremo', '+39-0184-123456', 'vendite@floritalia.it'),
+('Kenya Flowers', 'Kenya Flowers Ltd.', 'Nairobi', '+254-20-123456', 'export@kenyaflowers.co.ke');
+
+-- Inserimento clienti
+INSERT INTO clienti (nome, cognome, ragione_sociale, citta, telefono, email) VALUES
+('Mario', 'Rossi', 'Fioreria Centrale', 'Milano', '+39-02-123456', 'mario.rossi@fioreria.it'),
+('Laura', 'Bianchi', 'Fiori & Co.', 'Roma', '+39-06-654321', 'laura@fiorieco.it'),
+('Giuseppe', 'Verdi', 'Il Petalo d''Oro', 'Napoli', '+39-081-987654', 'info@petalodoro.it');
+
+-- Inserimento fattura di acquisto
+INSERT INTO fatture (numero, tipo, data, fornitore_id, stato) VALUES
+('FA001/2025', 'acquisto', '2025-01-15', 1, 'confermata');
+
+-- Inserimento lotti di magazzino (collegati alla fattura)
+INSERT INTO lotti_magazzino (
+  prodotto_id, colore_id, altezza_id, qualita_id, provenienza_id,
+  imballo, quantita, prezzo_acquisto, percentuale_1, percentuale_2, percentuale_3,
+  fattura_id, data_carico
+) VALUES
+-- Rose rosse olandesi
+(1, 1, 4, 1, 1, 10, 100, 1.20, 50, 60, 70, 1, '2025-01-15'),
+-- Rose bianche olandesi  
+(1, 2, 4, 1, 1, 10, 80, 1.15, 55, 65, 75, 1, '2025-01-15'),
+-- Tulipani gialli olandesi
+(4, 4, 3, 1, 1, 20, 200, 0.80, 60, 70, 80, 1, '2025-01-15'),
+-- Gerbere rosa italiane
+(8, 3, 2, 2, 2, 5, 50, 0.90, 45, 55, 65, 1, '2025-01-15');
+
+-- Inserimento dettagli fattura acquisto
+INSERT INTO dettagli_fattura (fattura_id, lotto_id, quantita, prezzo_unitario) VALUES
+(1, 1, 100, 1.20),  -- Rose rosse
+(1, 2, 80, 1.15),   -- Rose bianche  
+(1, 3, 200, 0.80),  -- Tulipani gialli
+(1, 4, 50, 0.90);   -- Gerbere rosa
+
+-- Inserimento fattura di vendita
+INSERT INTO fatture (numero, tipo, data, cliente_id, stato) VALUES
+('FV001/2025', 'vendita', '2025-01-20', 1, 'confermata');
+
+-- Dettagli vendita (prelevo dai lotti esistenti)
+INSERT INTO dettagli_fattura (fattura_id, lotto_id, quantita, prezzo_unitario) VALUES
+(2, 1, 30, 1.92),   -- 30 rose rosse (prezzo vendita calcolato)
+(2, 3, 50, 1.36);   -- 50 tulipani gialli
+
+-- Aggiorno le quantità dei lotti dopo la vendita
+UPDATE lotti_magazzino SET quantita = quantita - 30 WHERE id = 1;  -- Rose rosse: 100-30=70
+UPDATE lotti_magazzino SET quantita = quantita - 50 WHERE id = 3;  -- Tulipani: 200-50=150
+
+-- Inserimento eventi per tracciabilità
+INSERT INTO eventi (tipo, descrizione, lotto_id, fattura_id) VALUES
+('carico', 'Carico iniziale rose rosse da FloraHolland', 1, 1),
+('carico', 'Carico iniziale rose bianche da FloraHolland', 2, 1),
+('carico', 'Carico iniziale tulipani gialli da FloraHolland', 3, 1),
+('carico', 'Carico iniziale gerbere rosa italiane', 4, 1),
+('vendita', 'Vendita 30 rose rosse a Fioreria Centrale', 1, 2),
+('vendita', 'Vendita 50 tulipani gialli a Fioreria Centrale', 3, 2);

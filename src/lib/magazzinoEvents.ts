@@ -10,12 +10,7 @@ export type MagazzinoEventType =
   | 'vendita_completata'
   | 'acquisto_completato'
   | 'cliente_aggiornato'
-  | 'fornitore_aggiornato'
-  | 'ordine_creato'
-  | 'pagamento_aggiornato'
-  | 'scadenza_prossima'
-  | 'sync_richiesta'
-  | 'sync_completata';
+  | 'fornitore_aggiornato';
 
 export interface MagazzinoEvent {
   type: MagazzinoEventType;
@@ -37,13 +32,6 @@ export interface MagazzinoEvents {
   // EVENTI ENTITÀ
   cliente_aggiornato: { cliente_id: number; timestamp: Date };
   fornitore_aggiornato: { fornitore_id: number; timestamp: Date };
-  ordine_creato: { ordine_id: number; tipo: string; timestamp: Date };
-  // EVENTI CONTABILITÀ 
-  pagamento_aggiornato: { fattura_id: number; tipo: 'pagamento' | 'incasso'; stato: string; timestamp: Date };
-  scadenza_prossima: { fattura_id: number; giorni: number; timestamp: Date };
-  // EVENTI SINCRONIZZAZIONE
-  sync_richiesta: { componente: string; timestamp: Date };
-  sync_completata: { componenti: string[]; timestamp: Date };
 }
 
 class MagazzinoEventBus {
@@ -149,15 +137,6 @@ export function useMagazzinoEmitter() {
     }),
     emitFornitoreAggiornato: (fornitore_id: number) => magazzinoEventBus.emit('fornitore_aggiornato', { 
       fornitore_id, 
-      timestamp: new Date() 
-    }),
-    emitOrdineCreato: (ordine_id: number, tipo: string) => magazzinoEventBus.emit('ordine_creato', { 
-      ordine_id, 
-      tipo, 
-      timestamp: new Date() 
-    }),
-    emitSyncRichiesta: (componente: string) => magazzinoEventBus.emit('sync_richiesta', { 
-      componente, 
       timestamp: new Date() 
     })
   };
