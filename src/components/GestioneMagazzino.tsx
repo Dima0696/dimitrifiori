@@ -11,6 +11,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AddIcon from '@mui/icons-material/Add';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 
 // Importiamo i componenti principali per il magazzino
 import InserimentoFattureMultiRiga from './magazzino/InserimentoFattureMultiRiga';
@@ -96,7 +97,7 @@ export default function GestioneMagazzino() {
 
   const tabs = [
     {
-      label: 'Inserimento Fattura',
+      label: 'Fatture Acquisti',
       icon: <ReceiptLongIcon />,
       color: theme.palette.primary.main,
     },
@@ -106,8 +107,8 @@ export default function GestioneMagazzino() {
       color: theme.palette.success.main,
     },
     {
-      label: 'Documenti Carico',
-      icon: <DescriptionIcon />,
+      label: 'Movimenti',
+      icon: <AssessmentIcon />,
       color: theme.palette.info.main,
     },
   ];

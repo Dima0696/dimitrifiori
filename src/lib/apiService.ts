@@ -418,21 +418,57 @@ class ApiService {
       const motivi: string[] = [];
       const dettagli: any = {};
       
-      // 1. Verifica movimenti di scarico/vendita dalla tabella movimenti_magazzino
-      const { data: movimentiScarico, error: errorScarico } = await supabase
+      // 1. Ottieni numero fattura per i controlli
+      const { data: fatturaInfo, error: errorFattura } = await supabase
+        .from('fatture_acquisto')
+        .select('numero')
+        .eq('id', fattura_acquisto_id)
+        .single();
+        
+      if (errorFattura) throw errorFattura;
+      const numeroFattura = fatturaInfo?.numero;
+      
+      // 2. CONTROLLO CRITICO: Verifica movimenti NON di carico (vendite, distruzioni, etc.)
+      const { data: movimentiBloccanti, error: errorMovimenti } = await supabase
         .from('movimenti_magazzino')
         .select('*')
-        .eq('fattura_id', fattura_acquisto_id)
-        .in('tipo', ['scarico', 'vendita']);
+        .eq('fattura_numero', numeroFattura)
+        .neq('tipo', 'carico'); // Tutti tranne i carichi
       
-      if (errorScarico) throw errorScarico;
+      if (errorMovimenti) throw errorMovimenti;
       
-      if (movimentiScarico && movimentiScarico.length > 0) {
-        motivi.push(`Trovati ${movimentiScarico.length} movimenti di vendita/scarico`);
-        dettagli.movimentiScarico = movimentiScarico;
+      if (movimentiBloccanti && movimentiBloccanti.length > 0) {
+        const tipiMovimenti = [...new Set(movimentiBloccanti.map(m => m.tipo))];
+        motivi.push(`❌ ELIMINAZIONE BLOCCATA: Trovati ${movimentiBloccanti.length} movimenti bloccanti: ${tipiMovimenti.join(', ')}`);
+        dettagli.movimentiBloccanti = movimentiBloccanti;
+        console.log('🚨 FATTURA NON ELIMINABILE - Movimenti bloccanti:', movimentiBloccanti);
       }
       
-      // 2. Ottieni info sulla fattura e articoli
+      // 3. Verifica distruzioni dirette sui documenti di carico
+      const { data: documentiCaricoDaControllare, error: errorDocCheck } = await supabase
+        .from('documenti_carico')
+        .select('id')
+        .eq('fattura_acquisto_id', fattura_acquisto_id);
+        
+      if (errorDocCheck) throw errorDocCheck;
+      
+      if (documentiCaricoDaControllare && documentiCaricoDaControllare.length > 0) {
+        const { data: distruzioni, error: errorDistr } = await supabase
+          .from('documenti_distruzione')
+          .select('id, quantita_distrutta, data_distruzione, stato')
+          .in('documento_carico_id', documentiCaricoDaControllare.map(d => d.id))
+          .eq('stato', 'attiva');
+          
+        if (errorDistr) throw errorDistr;
+        
+        if (distruzioni && distruzioni.length > 0) {
+          motivi.push(`❌ ELIMINAZIONE BLOCCATA: Trovate ${distruzioni.length} distruzioni attive sui documenti di carico`);
+          dettagli.distruzioni = distruzioni;
+          console.log('🚨 FATTURA NON ELIMINABILE - Distruzioni trovate:', distruzioni);
+        }
+      }
+      
+      // 4. Ottieni info sulla fattura e articoli
       const { data: documentiCarico, error: errorDoc } = await supabase
         .from('view_documenti_carico_completi')
         .select('*')
@@ -470,6 +506,7 @@ class ApiService {
 
   /**
    * Elimina completamente una fattura e tutti i dati correlati
+   * VERSIONE MIGLIORATA: Usa funzione PostgreSQL sicura
    */
   async eliminaFattura(fattura_acquisto_id: number): Promise<void> {
     try {
@@ -481,120 +518,15 @@ class ApiService {
         throw new Error(`Fattura non eliminabile: ${verifica.motivi.join(', ')}`);
       }
       
-      // ELIMINAZIONE IN CASCATA (ordine importante!)
+      // USA FUNZIONE POSTGRESQL SICURA
+      console.log('🗑️ Chiamata funzione PostgreSQL sicura...');
+      const { data, error } = await supabase.rpc('elimina_fattura_sicura', {
+        p_fattura_id: fattura_acquisto_id
+      });
       
-      // 1. ELIMINA TUTTI i movimenti_dettagliati collegati a questa fattura
-      // Ci sono 3 possibili collegamenti da controllare:
+      if (error) throw error;
       
-      console.log('🗑️ Step 1: Eliminazione movimenti_dettagliati diretti...');
-      // A. Elimina quelli collegati direttamente alla fattura
-      const { error: errorDettagliatiDiretti } = await supabase
-        .from('movimenti_dettagliati')
-        .delete()
-        .eq('fattura_acquisto_id', fattura_acquisto_id);
-      
-      if (errorDettagliatiDiretti) throw errorDettagliatiDiretti;
-      
-      console.log('🗑️ Step 2: Eliminazione movimenti_dettagliati via documenti...');
-      // B. Elimina quelli collegati via documenti_carico
-      const { data: documentiCarico } = await supabase
-        .from('documenti_carico')
-        .select('id')
-        .eq('fattura_acquisto_id', fattura_acquisto_id);
-      
-      if (documentiCarico && documentiCarico.length > 0) {
-        const { error: errorDettagliatiDocumenti } = await supabase
-          .from('movimenti_dettagliati')
-          .delete()
-          .in('documento_carico_id', documentiCarico.map(d => d.id));
-        
-        if (errorDettagliatiDocumenti) throw errorDettagliatiDocumenti;
-      }
-      
-      console.log('🗑️ Step 3: Eliminazione movimenti_dettagliati via movimenti...');
-      // C. Elimina quelli collegati via movimenti_magazzino
-      const { data: movimentiMagazzino } = await supabase
-        .from('movimenti_magazzino')
-        .select('id')
-        .eq('fattura_id', fattura_acquisto_id);
-      
-      if (movimentiMagazzino && movimentiMagazzino.length > 0) {
-        // Nota: nella struttura attuale non c'è movimento_id in movimenti_dettagliati
-        // ma lo includo per sicurezza futura
-        console.log('📝 Movimenti magazzino trovati:', movimentiMagazzino.length);
-      }
-      
-      console.log('✅ Tutti i movimenti dettagliati eliminati');
-      
-      // 2. Ora elimina movimenti magazzino
-      const { error: errorMovimenti } = await supabase
-        .from('movimenti_magazzino')
-        .delete()
-        .eq('fattura_id', fattura_acquisto_id);
-      
-      if (errorMovimenti) throw errorMovimenti;
-      console.log('✅ Movimenti magazzino eliminati');
-      
-      // 4. Elimina costi fattura
-      const { error: errorCosti } = await supabase
-        .from('costi_fattura')
-        .delete()
-        .eq('fattura_acquisto_id', fattura_acquisto_id);
-      
-      if (errorCosti) throw errorCosti;
-      console.log('✅ Costi fattura eliminati');
-      
-      // 5. Elimina documenti di carico UNO PER UNO per evitare trigger
-      console.log('🗑️ Eliminazione documenti di carico...');
-      
-      // Ottieni lista documenti da eliminare
-      const { data: documentiDaEliminare } = await supabase
-        .from('documenti_carico')
-        .select('id')
-        .eq('fattura_acquisto_id', fattura_acquisto_id);
-      
-      if (documentiDaEliminare && documentiDaEliminare.length > 0) {
-        console.log(`📦 Eliminazione di ${documentiDaEliminare.length} documenti di carico...`);
-        
-        // Elimina ogni documento individualmente
-        for (const doc of documentiDaEliminare) {
-          try {
-            // Prima elimina eventuali movimenti_dettagliati residui per questo documento
-            await supabase
-              .from('movimenti_dettagliati')
-              .delete()
-              .eq('documento_carico_id', doc.id);
-            
-            // Poi elimina il documento
-            const { error } = await supabase
-              .from('documenti_carico')
-              .delete()
-              .eq('id', doc.id);
-              
-            if (error) {
-              console.error(`❌ Errore eliminazione documento ${doc.id}:`, error);
-              throw error;
-            }
-            console.log(`✅ Documento ${doc.id} eliminato`);
-          } catch (error) {
-            console.error(`❌ Errore grave documento ${doc.id}:`, error);
-            throw error;
-          }
-        }
-      }
-      
-      console.log('✅ Tutti i documenti di carico eliminati');
-      
-      // 6. Elimina fattura principale
-      const { error: errorFattura } = await supabase
-        .from('fatture_acquisto')
-        .delete()
-        .eq('id', fattura_acquisto_id);
-      
-      if (errorFattura) throw errorFattura;
-      console.log('✅ Fattura eliminata completamente');
-      
-      console.log('🎉 Eliminazione fattura completata con successo');
+      console.log('✅ Fattura eliminata con funzione PostgreSQL sicura:', data);
       
     } catch (error) {
       console.error('❌ Errore eliminazione fattura:', error);
@@ -2328,15 +2260,8 @@ class ApiService {
         .select(`
           *,
           gruppi:gruppo_id(nome),
-          prodotti:prodotto_id(nome),
           colori:colore_id(nome),
-          provenienze:provenienza_id(nome),
-          foto:foto_id(nome),
-          imballaggi:imballo_id(nome),
-          altezze:altezza_id(descrizione, altezza_cm),
-          qualita:qualita_id(nome),
-          fornitori:fornitore_id(nome),
-          clienti:cliente_id(nome)
+          prodotti:prodotto_id(nome)
         `)
         .order('data', { ascending: false })
         .order('created_at', { ascending: false });
@@ -2368,23 +2293,21 @@ class ApiService {
         throw error;
       }
 
-      // Trasforma i dati per includere i nomi delle caratteristiche
+      // Trasforma i dati includendo le informazioni complete
       const movimentiConNomi = data?.map((movimento: any) => ({
         ...movimento,
-        gruppo_nome: movimento.gruppi?.nome,
-        prodotto_nome: movimento.prodotti?.nome,
-        colore_nome: movimento.colori?.nome,
-        provenienza_nome: movimento.provenienze?.nome,
-        foto_nome: movimento.foto?.nome,
-        imballo_nome: movimento.imballaggi?.nome,
-        altezza_nome: movimento.altezze?.descrizione || 
-                     (movimento.altezze?.altezza_cm ? `${movimento.altezze.altezza_cm}cm` : null),
-        qualita_nome: movimento.qualita?.nome,
-        fornitore_nome: movimento.fornitori?.nome,
-        cliente_nome: movimento.clienti?.nome
+        gruppo_nome: movimento.gruppi?.nome || `Gruppo ${movimento.gruppo_id || 'N/A'}`,
+        colore_nome: movimento.colori?.nome || null,
+        prodotto_nome: movimento.prodotti?.nome || null,
+        // Crea il nome articolo completo
+        articolo_completo: [
+          movimento.gruppi?.nome,
+          movimento.colori?.nome,
+          movimento.prodotti?.nome
+        ].filter(Boolean).join(' - ') || `Articolo ${movimento.gruppo_id || 'N/A'}`
       })) || [];
 
-      console.log('✅ Movimenti caricati:', movimentiConNomi.length);
+      console.log('✅ Movimenti caricati con nomi:', movimentiConNomi.length);
       return movimentiConNomi;
     } catch (error) {
       console.error('❌ Errore nel caricamento movimenti:', error);

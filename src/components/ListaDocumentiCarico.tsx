@@ -226,70 +226,15 @@ export const MovimentiMagazzino: React.FC = () => {
       console.log('✅ Statistiche calcolate:', statisticheData);
       
     } catch (err) {
-      console.error('Errore caricamento dati:', err);
-      setError('Errore nel caricamento dei dati');
-      
-      // In caso di errore (es. tabella non esiste), carica dati mock
-      await loadMovimentiMock();
+      console.error('❌ Errore caricamento dati movimenti:', err);
+      setError('Errore nel caricamento dei dati. Verificare la connessione al database.');
+      setMovimenti([]); // Lista vuota invece di mock
     } finally {
       setLoading(false);
     }
   };
 
-  // Funzione temporanea per caricare dati mock
-  const loadMovimentiMock = async () => {
-    // Simuliamo dati di movimenti di magazzino
-    const mockMovimenti: MovimentoMagazzino[] = [
-      {
-        id: 1,
-        tipo: 'carico',
-        data: '2024-01-15',
-        quantita: 100,
-        prezzo_unitario: 0.85,
-        valore_totale: 85.00,
-        gruppo_nome: 'Rose',
-        prodotto_nome: 'Rosa Standard',
-        colore_nome: 'Rosso',
-        altezza_nome: 'Media (60cm)',
-        fattura_numero: 'FAT001',
-        fornitore_nome: 'Fornitore A',
-        note: 'Carico da fattura acquisto',
-        created_at: '2024-01-15T10:00:00',
-        utente: 'Admin'
-      },
-      {
-        id: 2,
-        tipo: 'scarico',
-        data: '2024-01-16',
-        quantita: 50,
-        prezzo_unitario: 1.20,
-        valore_totale: 60.00,
-        gruppo_nome: 'Rose',
-        prodotto_nome: 'Rosa Standard',
-        colore_nome: 'Rosso',
-        altezza_nome: 'Media (60cm)',
-        cliente_nome: 'Cliente A',
-        note: 'Vendita al dettaglio',
-        created_at: '2024-01-16T14:30:00',
-        utente: 'Admin'
-      },
-      {
-        id: 3,
-        tipo: 'distruzione',
-        data: '2024-01-17',
-        quantita: 10,
-        gruppo_nome: 'Rose',
-        prodotto_nome: 'Rosa Standard',
-        colore_nome: 'Rosso',
-        altezza_nome: 'Media (60cm)',
-        note: 'Fiori deteriorati',
-        created_at: '2024-01-17T09:15:00',
-        utente: 'Admin'
-      }
-    ];
-    
-    setMovimenti(mockMovimenti);
-  };
+
 
   // =========================================================================
   // FILTRI E RICERCA
@@ -741,10 +686,10 @@ export const MovimentiMagazzino: React.FC = () => {
                       <TableCell>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {movimento.gruppo_nome} - {movimento.prodotto_nome}
+                            {movimento.articolo_completo || [movimento.gruppo_nome, movimento.prodotto_nome].filter(Boolean).join(' - ') || 'Articolo N/A'}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {movimento.colore_nome} {movimento.altezza_nome && `- ${movimento.altezza_nome}`}
+                            {[movimento.colore_nome, movimento.altezza_nome].filter(Boolean).join(' - ') || 'Dettagli N/A'}
                           </Typography>
                         </Box>
                       </TableCell>

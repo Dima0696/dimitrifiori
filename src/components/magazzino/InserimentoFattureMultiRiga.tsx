@@ -1381,18 +1381,9 @@ export default function InserimentoFattureMultiRiga() {
           severity: 'success'
         });
 
-        // AGGIORNAMENTO AUTOMATICO MOVIMENTI MAGAZZINO
-        try {
-          await apiService.updateMovimentiFromFattura(fatturaSelezionata.fattura_acquisto_id, formData);
-          console.log('✅ Movimenti di magazzino aggiornati automaticamente');
-        } catch (movError) {
-          console.error('⚠️ Errore aggiornamento movimenti magazzino:', movError);
-          setSnackbar({
-            open: true,
-            message: 'Fattura salvata ma errore nell\'aggiornamento movimenti magazzino',
-            severity: 'warning'
-          });
-        }
+        // AGGIORNAMENTO AUTOMATICO MOVIMENTI MAGAZZINO (gestito da trigger SQL)
+        // TODO: Rimosso temporaneamente - ora gestito automaticamente da trigger database
+        console.log('✅ Movimenti di magazzino gestiti automaticamente da trigger database');
         
       } else {
         // MODALITÀ CREAZIONE: usa la procedura che gestisce fattura + documento
@@ -1479,20 +1470,9 @@ export default function InserimentoFattureMultiRiga() {
           });
         }
 
-        // CREAZIONE AUTOMATICA MOVIMENTI MAGAZZINO
-        try {
-          if (result && result.fattura_id) {
-            await apiService.updateMovimentiFromFattura(result.fattura_id, formData);
-            console.log('✅ Movimenti di magazzino creati automaticamente');
-          }
-        } catch (movError) {
-          console.error('⚠️ Errore creazione movimenti magazzino:', movError);
-          setSnackbar({
-            open: true,
-            message: 'Fattura creata ma errore nella creazione movimenti magazzino',
-            severity: 'warning'
-          });
-        }
+        // CREAZIONE AUTOMATICA MOVIMENTI MAGAZZINO (gestito da trigger SQL)
+        // TODO: Rimosso temporaneamente - ora gestito automaticamente da trigger database
+        console.log('✅ Movimenti di magazzino gestiti automaticamente da trigger database');
       }
       
       handleCloseDialog();
