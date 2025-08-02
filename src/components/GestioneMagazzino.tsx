@@ -6,16 +6,15 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import InventoryIcon from '@mui/icons-material/Inventory';
-import DeleteIcon from '@mui/icons-material/Delete';
+
 import DescriptionIcon from '@mui/icons-material/Description';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AddIcon from '@mui/icons-material/Add';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 
-// Importiamo i 3 componenti principali
+// Importiamo i componenti principali per il magazzino
 import InserimentoFattureMultiRiga from './magazzino/InserimentoFattureMultiRiga';
 import GiacenzeMagazzino from './magazzino/GiacenzeMagazzino';
-import DistruzioneMagazzino from './magazzino/DistruzioneMagazzino';
 import { MovimentiMagazzino } from './ListaDocumentiCarico';
 import ModernCard from './ui/ModernCard';
 
@@ -105,11 +104,6 @@ export default function GestioneMagazzino() {
       label: 'Giacenze',
       icon: <InventoryIcon />,
       color: theme.palette.success.main,
-    },
-    {
-      label: 'Distruzione',
-      icon: <DeleteIcon />,
-      color: theme.palette.error.main,
     },
     {
       label: 'Documenti Carico',
@@ -251,10 +245,6 @@ export default function GestioneMagazzino() {
               </TabPanel>
 
               <TabPanel value={tabValue} index={2}>
-                <DistruzioneMagazzino />
-              </TabPanel>
-
-              <TabPanel value={tabValue} index={3}>
                 <MovimentiMagazzino />
               </TabPanel>
             </motion.div>

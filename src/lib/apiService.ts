@@ -1494,6 +1494,93 @@ class ApiService {
   }
 
   /**
+   * Ottiene tutti i movimenti magazzino per un articolo specifico
+   */
+  async getMovimentiPerArticolo(articolo_id: number): Promise<MovimentoMagazzino[]> {
+    try {
+      console.log('🔍 Caricamento movimenti per articolo:', articolo_id);
+
+      if (!articolo_id || articolo_id <= 0) {
+        throw new Error('ID articolo non valido');
+      }
+
+      // Query per ottenere tutti i movimenti correlati all'articolo
+      // Includiamo sia i carichi (documenti_carico) che eventuali movimenti diretti
+      const { data: carichi, error: erroreCarichi } = await supabase
+        .from('view_documenti_carico_completi')
+        .select('*')
+        .eq('articolo_id', articolo_id)
+        .order('created_at', { ascending: false });
+
+      if (erroreCarichi) throw erroreCarichi;
+
+      // Debug: mostra la struttura del primo record per capire i campi disponibili
+      if (carichi && carichi.length > 0) {
+        console.log('🔍 Struttura dati carico:', Object.keys(carichi[0]));
+        console.log('🔍 Primo record:', carichi[0]);
+      }
+
+      // Conversione dei documenti di carico in formato MovimentoMagazzino
+      // Usiamo controlli più robusti per evitare errori su campi undefined
+      const movimentiCarico: MovimentoMagazzino[] = (carichi || []).map(carico => {
+        // Calcolo sicuro del valore totale
+        const quantita = carico.quantita || 0;
+        const prezzoUnitario = carico.prezzo_acquisto_per_stelo || 0;
+        const prezzoCostoFinale = carico.prezzo_costo_finale_per_stelo || prezzoUnitario;
+        
+        return {
+          id: carico.id || 0,
+          tipo: 'carico' as const,
+          data: carico.fattura_data || carico.created_at || new Date().toISOString(),
+          quantita: quantita,
+          prezzo_unitario: prezzoUnitario,
+          valore_totale: quantita * prezzoCostoFinale,
+          
+          // Dati articolo - con controlli di esistenza
+          gruppo_id: carico.gruppo_id || 0,
+          gruppo_nome: carico.gruppo_nome || 'N/A',
+          prodotto_id: carico.prodotto_id || 0,
+          prodotto_nome: carico.prodotto_nome || 'N/A',
+          colore_id: carico.colore_id || 0,
+          colore_nome: carico.colore_nome || 'N/A',
+          provenienza_id: carico.provenienza_id || 0,
+          provenienza_nome: carico.provenienza_nome || 'N/A',
+          foto_id: carico.foto_id || 0,
+          foto_nome: carico.foto_nome || 'N/A',
+          imballo_id: carico.imballo_id || 0,
+          imballo_nome: carico.imballo_nome || 'N/A',
+          altezza_id: carico.altezza_id || 0,
+          altezza_nome: carico.altezza_descrizione || carico.altezza_nome || 'N/A',
+          qualita_id: carico.qualita_id || 0,
+          qualita_nome: carico.qualita_nome || 'N/A',
+          
+          // Documenti di riferimento
+          fattura_id: carico.fattura_acquisto_id || carico.fattura_id || 0,
+          fattura_numero: carico.fattura_numero || carico.numero || 'N/A',
+          fornitore_id: carico.fornitore_id || 0,
+          fornitore_nome: carico.fornitore_nome || 'N/A',
+          
+          // Metadati
+          note: carico.note || `Carico da fattura ${carico.fattura_numero || carico.numero || 'N/A'}`,
+          utente: 'Sistema',
+          created_at: carico.created_at || new Date().toISOString(),
+          updated_at: carico.updated_at || carico.created_at || new Date().toISOString()
+        };
+      });
+
+      // Eventualmente qui si potrebbero aggiungere altri tipi di movimento 
+      // (scarichi, distruzioni, etc.) se implementati in futuro
+
+      console.log(`✅ Trovati ${movimentiCarico.length} movimenti per articolo ${articolo_id}`);
+      return movimentiCarico;
+
+    } catch (error) {
+      console.error('Errore nel caricamento movimenti articolo:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Aggiorna l'imballo di un articolo (propaga a documento di carico)
    * ATTENZIONE: Questo aggiorna l'ARTICOLO stesso, quindi tutti i documenti che lo usano
    */
@@ -1885,32 +1972,78 @@ class ApiService {
     }
   }
 
+  // RIMOSSO: distruggiArticoli (era usato dalla pagina DistruzioneMagazzino eliminata)
+  // Ora usiamo solo distruggiSingoloCarico per le distruzioni dalle giacenze
+
   /**
-   * Distrugge articoli spostandoli nel magazzino Moria
+   * Distrugge un singolo carico (versione semplificata per giacenze)
    */
-  async distruggiArticoli(dati: {
+  async distruggiSingoloCarico(dati: {
+    documento_carico_id: number;
+    quantita: number;
     motivo: string;
     note?: string;
-    data_distruzione: string;
-    articoli: Array<{
-      articolo_id: number;
-      quantita: number;
-      costo_unitario: number;
-    }>;
+    utente?: string;
   }): Promise<any> {
     try {
-      // Usa una transaction per garantire consistenza
-      const { data, error } = await supabase.rpc('distruggi_articoli', {
-        p_motivo: dati.motivo,
-        p_note: dati.note || '',
-        p_data_distruzione: dati.data_distruzione,
-        p_articoli: dati.articoli
+      console.log('🗑️ Distruzione singola carico:', dati);
+
+      // Chiama direttamente la funzione del database
+      const { data, error } = await supabase.rpc('esegui_distruzione', {
+        p_documento_carico_id: dati.documento_carico_id,
+        p_quantita_da_distruggere: dati.quantita,
+        p_motivo_distruzione_id: 1, // TODO: gestire motivi dinamici
+        p_note: dati.note || `Distruzione singola: ${dati.motivo}`,
+        p_utente: dati.utente || 'Sistema'
       });
 
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Errore nella distruzione articoli:', error);
+      console.error('Errore nella distruzione singola:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Ottiene le distruzioni annullabili (entro 24 ore)
+   */
+  async getDistruzioniAnnullabili(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('view_distruzioni_annullabili')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Errore nel caricamento distruzioni annullabili:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Annulla una distruzione (solo entro 24 ore)
+   */
+  async annullaDistruzione(dati: {
+    distruzione_id: number;
+    motivo_annullamento?: string;
+    utente_annullamento?: string;
+  }): Promise<any> {
+    try {
+      console.log('↩️ Annullamento distruzione:', dati);
+
+      const { data, error } = await supabase.rpc('annulla_distruzione', {
+        p_distruzione_id: dati.distruzione_id,
+        p_motivo_annullamento: dati.motivo_annullamento || 'Annullamento da interfaccia',
+        p_utente_annullamento: dati.utente_annullamento || 'Sistema'
+      });
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Errore nell\'annullamento distruzione:', error);
       throw error;
     }
   }
