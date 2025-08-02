@@ -106,53 +106,112 @@ interface StatisticheMovimenti {
 // STILI MODERNI
 // =========================================================================
 
+// Colori moderni con accenti strategici
+const colors = {
+  primary: '#8b5cf6',     // Violet per movimenti
+  secondary: '#3b82f6',   // Blue
+  accent1: '#10b981',     // Emerald per carichi
+  accent2: '#ef4444',     // Red per scarichi  
+  accent3: '#f59e0b',     // Amber per distruzioni
+  text: '#1e293b',
+  textSecondary: '#64748b',
+  glass: 'rgba(255, 255, 255, 0.8)',
+  border: 'rgba(139, 92, 246, 0.2)',
+};
+
 const modernStyles = {
   mainContainer: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: 3
+    background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
+    padding: 2
   },
   glassmorphic: {
-    background: 'rgba(255, 255, 255, 0.9)',
+    background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.9) 100%)',
     backdropFilter: 'blur(20px)',
-    borderRadius: '20px',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)'
+    borderRadius: '12px',
+    border: `1px solid ${colors.border}`,
+    boxShadow: '0 4px 20px rgba(139, 92, 246, 0.08)',
+    position: 'relative',
+    overflow: 'hidden',
+
   },
   searchCard: {
-    background: 'rgba(255, 255, 255, 0.1)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '16px',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    mb: 3
+    background: colors.glass,
+    backdropFilter: 'blur(15px)',
+    borderRadius: '10px',
+    border: `1px solid ${colors.border}`,
+    mb: 2,
+    position: 'relative',
+    overflow: 'hidden',
+
   },
   primaryButton: {
-    background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
+    background: `linear-gradient(135deg, ${colors.primary} 0%, #7c3aed 100%)`,
     borderRadius: '12px',
     color: 'white',
     fontWeight: 600,
-    padding: '12px 24px',
+    padding: '10px 20px',
     textTransform: 'none',
-    boxShadow: '0 4px 16px rgba(102, 126, 234, 0.4)',
+    fontSize: '14px',
+    boxShadow: `0 4px 16px ${colors.primary}40`,
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     '&:hover': {
-      background: 'linear-gradient(45deg, #5a67d8 30%, #6b46c1 90%)',
+      background: `linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)`,
       transform: 'translateY(-2px)',
-      boxShadow: '0 6px 20px rgba(102, 126, 234, 0.6)'
+      boxShadow: `0 8px 25px ${colors.primary}50`
     }
   },
   secondaryButton: {
     borderRadius: '12px',
     fontWeight: 600,
     textTransform: 'none',
-    padding: '8px 16px'
-  },
-  statsCard: {
-    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-    borderRadius: '16px',
-    border: '1px solid rgba(102, 126, 234, 0.2)',
-    transition: 'transform 0.3s ease',
+    padding: '8px 16px',
+    fontSize: '14px',
+    border: `2px solid ${colors.border}`,
+    color: colors.text,
     '&:hover': {
-      transform: 'translateY(-4px)'
+      background: `${colors.primary}10`,
+      border: `2px solid ${colors.primary}40`,
+    }
+  },
+  // Stili unificati come in Giacenze
+  statsCard: {
+    p: 2.5,
+    borderRadius: '12px',
+    backdropFilter: 'blur(10px)',
+    border: `1px solid ${colors.border}`,
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    position: 'relative',
+    overflow: 'hidden',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      border: `1px solid ${colors.border}`,
+    }
+  },
+  // Cards con sfumature come in Giacenze
+  caricoCard: {
+    background: `linear-gradient(135deg, ${colors.accent1}15, ${colors.accent1}05)`,
+    '&:hover': {
+      boxShadow: `0 8px 25px ${colors.accent1}20`,
+    }
+  },
+  scaricoCard: {
+    background: `linear-gradient(135deg, ${colors.accent2}15, ${colors.accent2}05)`,
+    '&:hover': {
+      boxShadow: `0 8px 25px ${colors.accent2}20`,
+    }
+  },
+  distruzioneCard: {
+    background: `linear-gradient(135deg, ${colors.accent3}15, ${colors.accent3}05)`,
+    '&:hover': {
+      boxShadow: `0 8px 25px ${colors.accent3}20`,
+    }
+  },
+  // Card per movimenti totali
+  movimentiTotaliCard: {
+    background: `linear-gradient(135deg, ${colors.primary}15, ${colors.primary}05)`,
+    '&:hover': {
+      boxShadow: `0 8px 25px ${colors.primary}20`,
     }
   }
 };
@@ -381,21 +440,29 @@ export const MovimentiMagazzino: React.FC = () => {
       <Paper sx={modernStyles.glassmorphic}>
         <Box sx={{ p: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <AssessmentIcon sx={{ fontSize: 40, color: '#667eea', mr: 2 }} />
-              <Typography 
-                variant="h3" 
-                sx={{ 
-                  fontWeight: 700, 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  fontSize: { xs: '1.8rem', md: '2.5rem' }
-                }}
-              >
-                Movimenti di Magazzino
-              </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <AssessmentIcon sx={{ fontSize: 24, color: colors.primary }} />
+              <Box>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 600, 
+                    color: colors.text,
+                    fontSize: '1.2rem',
+                    letterSpacing: '-0.01em',
+                    mb: 0.5
+                  }}
+                >
+                  Movimenti
+                </Typography>
+                <Typography variant="body2" sx={{ 
+                  color: colors.textSecondary,
+                  fontWeight: 500,
+                  fontSize: '0.875rem'
+                }}>
+                  Storico completo di tutti i movimenti di magazzino
+                </Typography>
+              </Box>
             </Box>
             <Stack direction="row" spacing={2}>
               <Button
@@ -417,80 +484,96 @@ export const MovimentiMagazzino: React.FC = () => {
           </Box>
 
           {/* Statistiche */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={modernStyles.statsCard}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: '#667eea' }}>
-                        {stats.totaleMovimenti}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Movimenti Totali
-                      </Typography>
-                    </Box>
-                    <AssessmentIcon sx={{ fontSize: 40, color: '#667eea', opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={3}>
+              <Box sx={{...modernStyles.statsCard, ...modernStyles.movimentiTotaliCard}}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 700, 
+                  color: colors.primary,
+                  letterSpacing: '-0.01em',
+                  mb: 0.5
+                }}>
+                  {stats.totaleMovimenti}
+                </Typography>
+                <Typography variant="caption" sx={{ 
+                  color: colors.textSecondary,
+                  fontWeight: 500,
+                  fontSize: '0.75rem'
+                }}>
+                  Movimenti Totali
+                </Typography>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={modernStyles.statsCard}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: '#28a745' }}>
-                        {stats.movimentiCarico}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Carichi
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        €{stats.valoreCarico.toFixed(2)}
-                      </Typography>
-                    </Box>
-                    <TrendingUpIcon sx={{ fontSize: 40, color: '#28a745', opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
+            <Grid item xs={12} md={3}>
+              <Box sx={{...modernStyles.statsCard, ...modernStyles.caricoCard}}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 700, 
+                  color: colors.accent1,
+                  letterSpacing: '-0.01em',
+                  mb: 0.5
+                }}>
+                  {stats.movimentiCarico}
+                </Typography>
+                <Typography variant="caption" sx={{ 
+                  color: colors.textSecondary,
+                  fontWeight: 500,
+                  fontSize: '0.75rem'
+                }}>
+                  Carichi
+                </Typography>
+                <Typography variant="caption" sx={{ 
+                  color: colors.textSecondary,
+                  fontSize: '0.7rem',
+                  display: 'block'
+                }}>
+                  €{stats.valoreCarico.toFixed(2)}
+                </Typography>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={modernStyles.statsCard}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: '#dc3545' }}>
-                        {stats.movimentiScarico + stats.movimentiDistruzione}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Scarichi + Distruzioni
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        €{(stats.valoreScarico + stats.valoreDistruzione).toFixed(2)}
-                      </Typography>
-                    </Box>
-                    <TrendingDownIcon sx={{ fontSize: 40, color: '#dc3545', opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
+            <Grid item xs={12} md={3}>
+              <Box sx={{...modernStyles.statsCard, ...modernStyles.scaricoCard}}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 700, 
+                  color: colors.accent2,
+                  letterSpacing: '-0.01em',
+                  mb: 0.5
+                }}>
+                  {stats.movimentiScarico + stats.movimentiDistruzione}
+                </Typography>
+                <Typography variant="caption" sx={{ 
+                  color: colors.textSecondary,
+                  fontWeight: 500,
+                  fontSize: '0.75rem'
+                }}>
+                  Scarichi + Distruzioni
+                </Typography>
+                <Typography variant="caption" sx={{ 
+                  color: colors.textSecondary,
+                  fontSize: '0.7rem',
+                  display: 'block'
+                }}>
+                  €{(stats.valoreScarico + stats.valoreDistruzione).toFixed(2)}
+                </Typography>
+              </Box>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <Card sx={modernStyles.statsCard}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: '#667eea' }}>
-                        €{stats.giacenzaAttuale.toFixed(0)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Valore Giacenza
-                      </Typography>
-                    </Box>
-                    <StoreIcon sx={{ fontSize: 40, color: '#667eea', opacity: 0.7 }} />
-                  </Box>
-                </CardContent>
-              </Card>
+            <Grid item xs={12} md={3}>
+              <Box sx={{...modernStyles.statsCard, ...modernStyles.distruzioneCard}}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 700, 
+                  color: colors.accent3,
+                  letterSpacing: '-0.01em',
+                  mb: 0.5
+                }}>
+                  €{stats.giacenzaAttuale.toFixed(0)}
+                </Typography>
+                <Typography variant="caption" sx={{ 
+                  color: colors.textSecondary,
+                  fontWeight: 500,
+                  fontSize: '0.75rem'
+                }}>
+                  Valore Giacenza
+                </Typography>
+              </Box>
             </Grid>
           </Grid>
 
@@ -505,20 +588,26 @@ export const MovimentiMagazzino: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     InputProps={{
-                      startAdornment: <SearchIcon sx={{ color: 'white', mr: 1, opacity: 0.7 }} />,
+                      startAdornment: <SearchIcon sx={{ color: colors.text, mr: 1, opacity: 0.7 }} />,
                       sx: {
-                        color: 'white',
+                        color: colors.text,
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        borderRadius: '12px',
                         '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(255, 255, 255, 0.3)'
+                          borderColor: colors.border
                         },
                         '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: 'rgba(255, 255, 255, 0.5)'
+                          borderColor: colors.primary
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: colors.primary,
+                          boxShadow: `0 0 0 2px ${colors.primary}20`
                         }
                       }
                     }}
                     sx={{
-                      '& .MuiInputLabel-root': { color: 'rgba(255, 255, 255, 0.7)' },
-                      '& .MuiInputBase-input::placeholder': { color: 'rgba(255, 255, 255, 0.7)' }
+                      '& .MuiInputLabel-root': { color: colors.text },
+                      '& .MuiInputBase-input::placeholder': { color: colors.text, opacity: 0.6 }
                     }}
                   />
                 </Grid>

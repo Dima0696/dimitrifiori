@@ -19,9 +19,7 @@ import modernTheme from './styles/modernTheme';
 
 
 
-function Magazzino() {
-  return <MainLayout title="Magazzino"><GestioneMagazzino /></MainLayout>;
-}
+
 
 function App() {
   return (
@@ -29,7 +27,12 @@ function App() {
       <CssBaseline />
       <ErrorBoundary>
         <AuthProvider>
-          <Router>
+          <Router 
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true
+            }}
+          >
             <Routes>
                 {/* Autenticazione */}
                 <Route path="/login" element={<Login />} />
@@ -39,7 +42,7 @@ function App() {
                 <Route path="/dashboard" element={<ProtectedRoute><MainLayout title="Dashboard"><Dashboard /></MainLayout></ProtectedRoute>} />
                 
                 {/* Magazzino - Sistema nuovo */}
-                <Route path="/magazzino" element={<ProtectedRoute><Magazzino /></ProtectedRoute>} />
+                <Route path="/magazzino" element={<ProtectedRoute><MainLayout title="Gestione Magazzino"><GestioneMagazzino /></MainLayout></ProtectedRoute>} />
                 
                 {/* Anagrafica - Sistema nuovo */}
                 <Route path="/anagrafica" element={<ProtectedRoute><MainLayout title="Anagrafica"><Anagrafica /></MainLayout></ProtectedRoute>} />

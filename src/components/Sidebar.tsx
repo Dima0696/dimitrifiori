@@ -31,7 +31,19 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
   const drawerWidth = 280;
   const location = useLocation();
   const navigate = useNavigate();
-  const [openOrdini, setOpenOrdini] = useState(true);
+  const [openOrdini, setOpenOrdini] = useState(false); // Chiuso by default per risparmiare spazio
+
+  // Palette colori moderna per sidebar
+  const sidebarColors = {
+    background: 'linear-gradient(145deg, #1e293b 0%, #334155 100%)',
+    glass: 'rgba(255, 255, 255, 0.1)',
+    text: '#f1f5f9',
+    textSecondary: '#cbd5e1',
+    accent: '#3b82f6',
+    accentLight: 'rgba(59, 130, 246, 0.2)',
+    hover: 'rgba(255, 255, 255, 0.1)',
+    border: 'rgba(255, 255, 255, 0.1)',
+  };
 
   const menuItems = [
     { label: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
@@ -55,69 +67,155 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
   ];
 
   const drawerContent = (
-    <Box sx={{ height: '100%', bgcolor: '#ffffff', color: '#333333', display: 'flex', flexDirection: 'column', p: 0, borderRight: '1px solid #e0e0e0' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', p: 3, pb: 2, gap: 2 }}>
-        {/* Logo moderno */}
-        <Box sx={{ width: 40, height: 40, bgcolor: '#2196F3', borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Typography variant="h5" fontWeight={900} color="#fff">DF</Typography>
+    <Box sx={{ 
+      height: '100%', 
+      background: sidebarColors.background,
+      color: sidebarColors.text, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      p: 0,
+      overflow: 'hidden', // Elimina scrollbar
+      backdropFilter: 'blur(20px)',
+    }}>
+      {/* Header compatto */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        p: 2.5, 
+        pb: 2, 
+        gap: 2,
+        background: sidebarColors.glass,
+        backdropFilter: 'blur(10px)',
+        borderBottom: `1px solid ${sidebarColors.border}`,
+      }}>
+        <Box sx={{ 
+          width: 36, 
+          height: 36, 
+          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+          borderRadius: '10px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+        }}>
+          <Typography variant="h6" fontWeight={900} color="#fff">DF</Typography>
         </Box>
-        <Typography variant="h6" fontWeight={700} color="#333333">DimitriFlor</Typography>
-      </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 3, pb: 2 }}>
-        <Avatar sx={{ bgcolor: '#2196F3', color: '#fff', width: 40, height: 40, fontWeight: 700 }}>P</Avatar>
-        <Box sx={{ ml: 2 }}>
-          <Typography variant="body1" fontWeight={600} color="#333333">Paolo Melone</Typography>
-          <Typography variant="caption" color="#666666">Amministratore</Typography>
+        <Box>
+          <Typography variant="h6" fontWeight={700} color={sidebarColors.text} sx={{ fontSize: '1.1rem' }}>
+            DimitriFlor
+          </Typography>
+          <Typography variant="caption" color={sidebarColors.textSecondary} sx={{ fontSize: '0.7rem' }}>
+            Management System
+          </Typography>
         </Box>
       </Box>
-      <Divider sx={{ bgcolor: '#e0e0e0', my: 2 }} />
-      <List sx={{ flex: 1, mt: 2 }}>
+
+      {/* User info compatto */}
+      <Box sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        px: 2.5, 
+        py: 2,
+        background: sidebarColors.glass,
+        backdropFilter: 'blur(10px)',
+        borderBottom: `1px solid ${sidebarColors.border}`,
+      }}>
+        <Avatar sx={{ 
+          background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', 
+          color: '#fff', 
+          width: 32, 
+          height: 32, 
+          fontWeight: 700,
+          fontSize: '0.9rem'
+        }}>
+          P
+        </Avatar>
+        <Box sx={{ ml: 1.5 }}>
+          <Typography variant="body2" fontWeight={600} color={sidebarColors.text} sx={{ fontSize: '0.85rem' }}>
+            Paolo Melone
+          </Typography>
+          <Typography variant="caption" color={sidebarColors.textSecondary} sx={{ fontSize: '0.7rem' }}>
+            Admin
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Menu items compatti */}
+      <List sx={{ 
+        flex: 1, 
+        pt: 1,
+        overflow: 'hidden', // Previene scroll
+        '&::-webkit-scrollbar': { display: 'none' }, // Nasconde scrollbar webkit
+        scrollbarWidth: 'none', // Nasconde scrollbar Firefox
+      }}>
         {menuItems.map((item) => (
           <ListItem disablePadding key={item.label} sx={{ mb: 0.5 }}>
             <ListItemButton
               sx={{
-                color: location.pathname === item.path ? '#2196F3' : '#666666',
-                borderRadius: 2,
-                mx: 2,
-                minHeight: 52,
-                px: 2.5,
-                bgcolor: location.pathname === item.path ? '#f3f7ff' : 'transparent',
+                color: location.pathname === item.path ? sidebarColors.accent : sidebarColors.textSecondary,
+                borderRadius: '12px',
+                mx: 1.5,
+                minHeight: 40, // Ridotto da 52 a 40
+                px: 2,
+                background: location.pathname === item.path ? sidebarColors.accentLight : 'transparent',
                 fontWeight: location.pathname === item.path ? 600 : 500,
-                '&:hover': { bgcolor: '#f5f5f5', color: '#333333' },
-                transition: 'all 0.2s ease',
+                '&:hover': { 
+                  background: sidebarColors.hover, 
+                  color: sidebarColors.text,
+                  transform: 'translateX(4px)',
+                },
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                backdropFilter: 'blur(10px)',
               }}
               selected={location.pathname === item.path}
               onClick={() => navigate(item.path)}
             >
-              <ListItemIcon sx={{ color: location.pathname === item.path ? '#2196F3' : '#666666', minWidth: 36 }}>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 600 : 500 }} />
+              <ListItemIcon sx={{ 
+                color: location.pathname === item.path ? sidebarColors.accent : sidebarColors.textSecondary, 
+                minWidth: 32, // Ridotto
+                fontSize: '1.2rem'
+              }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText 
+                primary={item.label} 
+                primaryTypographyProps={{ 
+                  fontWeight: location.pathname === item.path ? 600 : 500,
+                  fontSize: '0.85rem' // Font più piccolo
+                }} 
+              />
             </ListItemButton>
           </ListItem>
         ))}
 
-        <Divider sx={{ bgcolor: '#e0e0e0', my: 2 }} />
-
-        {/* Sezione Ordini */}
-        <ListItem disablePadding sx={{ mb: 0.5 }}>
+        {/* Sezione Ordini compatta */}
+        <ListItem disablePadding sx={{ mb: 0.5, mt: 1 }}>
           <ListItemButton
             onClick={() => setOpenOrdini(!openOrdini)}
             sx={{
-              color: '#666666',
-              borderRadius: 2,
-              mx: 2,
-              minHeight: 52,
-              px: 2.5,
-              bgcolor: 'transparent',
+              color: sidebarColors.textSecondary,
+              borderRadius: '12px',
+              mx: 1.5,
+              minHeight: 40, // Ridotto
+              px: 2,
+              background: 'transparent',
               fontWeight: 600,
-              '&:hover': { bgcolor: '#f5f5f5', color: '#333333' },
-              transition: 'all 0.2s ease',
+              '&:hover': { 
+                background: sidebarColors.hover, 
+                color: sidebarColors.text,
+                transform: 'translateX(4px)',
+              },
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            <ListItemIcon sx={{ color: '#666666', minWidth: 36 }}>
+            <ListItemIcon sx={{ color: sidebarColors.textSecondary, minWidth: 32 }}>
               <AssignmentIcon />
             </ListItemIcon>
-            <ListItemText primary="Ordini" primaryTypographyProps={{ fontWeight: 600 }} />
-            {openOrdini ? <ExpandLess /> : <ExpandMore />}
+            <ListItemText 
+              primary="Ordini" 
+              primaryTypographyProps={{ fontWeight: 600, fontSize: '0.85rem' }} 
+            />
+            {openOrdini ? <ExpandLess sx={{ fontSize: '1.2rem' }} /> : <ExpandMore sx={{ fontSize: '1.2rem' }} />}
           </ListItemButton>
         </ListItem>
         
@@ -127,30 +225,55 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
               <ListItem disablePadding key={item.label} sx={{ mb: 0.5 }}>
                 <ListItemButton
                   sx={{
-                    color: location.pathname === item.path ? '#2196F3' : '#666666',
-                    borderRadius: 2,
-                    mx: 2,
-                    ml: 4,
-                    minHeight: 52,
-                    px: 2.5,
-                    bgcolor: location.pathname === item.path ? '#f3f7ff' : 'transparent',
+                    color: location.pathname === item.path ? sidebarColors.accent : sidebarColors.textSecondary,
+                    borderRadius: '12px',
+                    mx: 1.5,
+                    ml: 3, // Ridotto indentazione
+                    minHeight: 36, // Più piccolo per sottomenu
+                    px: 2,
+                    background: location.pathname === item.path ? sidebarColors.accentLight : 'transparent',
                     fontWeight: location.pathname === item.path ? 600 : 500,
-                    '&:hover': { bgcolor: '#f5f5f5', color: '#333333' },
-                    transition: 'all 0.2s ease',
+                    '&:hover': { 
+                      background: sidebarColors.hover, 
+                      color: sidebarColors.text,
+                      transform: 'translateX(4px)',
+                    },
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                   selected={location.pathname === item.path}
                   onClick={() => navigate(item.path)}
                 >
-                  <ListItemIcon sx={{ color: location.pathname === item.path ? '#2196F3' : '#666666', minWidth: 36 }}>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.label} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 600 : 500 }} />
+                  <ListItemIcon sx={{ 
+                    color: location.pathname === item.path ? sidebarColors.accent : sidebarColors.textSecondary, 
+                    minWidth: 28 // Più piccolo
+                  }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={item.label} 
+                    primaryTypographyProps={{ 
+                      fontWeight: location.pathname === item.path ? 600 : 500,
+                      fontSize: '0.8rem' // Più piccolo per sottomenu
+                    }} 
+                  />
                 </ListItemButton>
               </ListItem>
             ))}
           </List>
         </Collapse>
       </List>
-      <Box sx={{ p: 3, pt: 0 }}>
-        <Typography variant="caption" color="#999999">© 2024 DimitriFlor</Typography>
+
+      {/* Footer compatto */}
+      <Box sx={{ 
+        p: 2, 
+        pt: 1,
+        background: sidebarColors.glass,
+        backdropFilter: 'blur(10px)',
+        borderTop: `1px solid ${sidebarColors.border}`,
+      }}>
+        <Typography variant="caption" color={sidebarColors.textSecondary} sx={{ fontSize: '0.7rem' }}>
+          © 2024 DimitriFlor
+        </Typography>
       </Box>
     </Box>
   );
@@ -162,7 +285,14 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
       onClose={onDrawerToggle}
       ModalProps={{ keepMounted: true }}
       sx={{
-        '& .MuiDrawer-paper': { width: 260, boxSizing: 'border-box', bgcolor: '#ffffff', borderRight: '1px solid #e0e0e0' },
+        '& .MuiDrawer-paper': { 
+          width: 260, 
+          boxSizing: 'border-box', 
+          background: sidebarColors.background,
+          borderRight: `1px solid ${sidebarColors.border}`,
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 0 40px rgba(0, 0, 0, 0.3)',
+        },
       }}
     >
       {drawerContent}
@@ -174,7 +304,15 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
       sx={{
         width: 260,
         flexShrink: 0,
-        '& .MuiDrawer-paper': { width: 260, boxSizing: 'border-box', bgcolor: '#ffffff', borderRight: '1px solid #e0e0e0' },
+        '& .MuiDrawer-paper': { 
+          width: 260, 
+          boxSizing: 'border-box', 
+          background: sidebarColors.background,
+          borderRight: `1px solid ${sidebarColors.border}`,
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 0 40px rgba(0, 0, 0, 0.3)',
+          overflow: 'hidden', // Elimina completamente lo scroll
+        },
       }}
     >
       {drawerContent}

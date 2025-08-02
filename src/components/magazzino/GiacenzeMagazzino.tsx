@@ -94,6 +94,22 @@ const getQualitaColor = (nome: string | undefined | null) => {
 };
 
 const GiacenzeMagazzino: React.FC = () => {
+  // Palette colori moderna e coerente
+  const modernColors = {
+    background: 'rgba(255, 255, 255, 0.95)',
+    glass: 'rgba(255, 255, 255, 0.8)',
+    primary: '#10b981',      // Emerald per giacenze
+    secondary: '#3b82f6',    // Blue
+    accent1: '#f59e0b',      // Amber per warning
+    accent2: '#ef4444',      // Red per errori
+    text: '#1e293b',         // Slate
+    textSecondary: '#64748b',
+    border: 'rgba(16, 185, 129, 0.2)',
+    success: '#22c55e',
+    warning: '#f59e0b',
+    error: '#ef4444',
+  };
+
   const [giacenze, setGiacenze] = useState<Giacenza[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -381,15 +397,44 @@ const GiacenzeMagazzino: React.FC = () => {
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 600, color: 'grey.800', mb: 1 }}>
-            📦 Giacenze Magazzino
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'grey.600' }}>
-            Visualizza e gestisci tutte le giacenze presenti in magazzino
-          </Typography>
+    <Box sx={{
+      background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
+      minHeight: '100vh',
+      p: 2
+    }}>
+      {/* Header moderno */}
+      <Box sx={{ 
+        mb: 3,
+        p: 3,
+        borderRadius: '16px',
+        background: modernColors.glass,
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${modernColors.border}`,
+        boxShadow: '0 4px 20px rgba(16, 185, 129, 0.06)',
+        position: 'relative',
+        overflow: 'hidden',
+
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <InventoryIcon sx={{ fontSize: 24, color: modernColors.primary }} />
+          <Box>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 600, 
+              color: modernColors.text,
+              fontSize: '1.2rem',
+              letterSpacing: '-0.01em',
+              mb: 0.5
+            }}>
+              Giacenze
+            </Typography>
+            <Typography variant="body2" sx={{ 
+              color: modernColors.textSecondary,
+              fontWeight: 500,
+              fontSize: '0.875rem'
+            }}>
+              Visualizza e gestisci tutte le giacenze presenti in magazzino
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
@@ -399,71 +444,184 @@ const GiacenzeMagazzino: React.FC = () => {
         </Alert>
       )}
 
-      {/* Statistiche */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      {/* Statistiche moderne */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'grey.300' }}>
-            <CardContent>
-              <Typography variant="h4" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                {giacenzeFiltrate.length}
-              </Typography>
-              <Typography variant="body2" color="grey.600">
-                Carichi in giacenza
-              </Typography>
-            </CardContent>
-          </Card>
+          <Box sx={{
+            p: 2.5,
+            borderRadius: '12px',
+            background: `linear-gradient(135deg, ${modernColors.primary}15, ${modernColors.primary}05)`,
+            backdropFilter: 'blur(10px)',
+            border: `1px solid ${modernColors.border}`,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            overflow: 'hidden',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: `0 8px 25px ${modernColors.primary}20`,
+              border: `1px solid ${modernColors.border}`,
+            },
+
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: modernColors.primary,
+              letterSpacing: '-0.01em',
+              mb: 0.5
+            }}>
+              {giacenzeFiltrate.length}
+            </Typography>
+            <Typography variant="caption" sx={{ 
+              color: modernColors.textSecondary,
+              fontWeight: 500,
+              fontSize: '0.75rem'
+            }}>
+              Carichi in giacenza
+            </Typography>
+          </Box>
         </Grid>
         <Grid item xs={12} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'grey.300' }}>
-            <CardContent>
-              <Typography variant="h4" sx={{ fontWeight: 600, color: 'success.main' }}>
-                {getTotalQuantity().toLocaleString()}
-              </Typography>
-              <Typography variant="body2" color="grey.600">
-                Steli totali
-              </Typography>
-            </CardContent>
-          </Card>
+          <Box sx={{
+            p: 2.5,
+            borderRadius: '12px',
+            background: `linear-gradient(135deg, ${modernColors.success}15, ${modernColors.success}05)`,
+            backdropFilter: 'blur(10px)',
+            border: `1px solid ${modernColors.border}`,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            overflow: 'hidden',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: `0 8px 25px ${modernColors.success}20`,
+              border: `1px solid ${modernColors.border}`,
+            },
+
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: modernColors.success,
+              letterSpacing: '-0.01em',
+              mb: 0.5
+            }}>
+              {getTotalQuantity().toLocaleString()}
+            </Typography>
+            <Typography variant="caption" sx={{ 
+              color: modernColors.textSecondary,
+              fontWeight: 500,
+              fontSize: '0.75rem'
+            }}>
+              Steli totali
+            </Typography>
+          </Box>
         </Grid>
         <Grid item xs={12} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'grey.300' }}>
-            <CardContent>
-              <Typography variant="h4" sx={{ fontWeight: 600, color: 'warning.main' }}>
-                € {getTotalValue().toFixed(2)}
-              </Typography>
-              <Typography variant="body2" color="grey.600">
-                Valore totale
-              </Typography>
-            </CardContent>
-          </Card>
+          <Box sx={{
+            p: 2.5,
+            borderRadius: '12px',
+            background: `linear-gradient(135deg, ${modernColors.warning}15, ${modernColors.warning}05)`,
+            backdropFilter: 'blur(10px)',
+            border: `1px solid ${modernColors.border}`,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            overflow: 'hidden',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: `0 8px 25px ${modernColors.warning}20`,
+              border: `1px solid ${modernColors.border}`,
+            },
+
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: modernColors.warning,
+              letterSpacing: '-0.01em',
+              mb: 0.5
+            }}>
+              € {getTotalValue().toFixed(2)}
+            </Typography>
+            <Typography variant="caption" sx={{ 
+              color: modernColors.textSecondary,
+              fontWeight: 500,
+              fontSize: '0.75rem'
+            }}>
+              Valore totale
+            </Typography>
+          </Box>
         </Grid>
         <Grid item xs={12} md={3}>
-          <Card elevation={0} sx={{ border: '1px solid', borderColor: 'grey.300' }}>
-            <CardContent>
-              <Typography variant="h4" sx={{ fontWeight: 600, color: 'info.main' }}>
-                {new Set(giacenzeFiltrate.map(g => g.articolo_nome)).size}
-              </Typography>
-              <Typography variant="body2" color="grey.600">
-                Articoli diversi
-              </Typography>
-            </CardContent>
-          </Card>
+          <Box sx={{
+            p: 2.5,
+            borderRadius: '12px',
+            background: `linear-gradient(135deg, ${modernColors.secondary}15, ${modernColors.secondary}05)`,
+            backdropFilter: 'blur(10px)',
+            border: `1px solid ${modernColors.border}`,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            position: 'relative',
+            overflow: 'hidden',
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: `0 8px 25px ${modernColors.secondary}20`,
+              border: `1px solid ${modernColors.border}`,
+            },
+
+          }}>
+            <Typography variant="h6" sx={{ 
+              fontWeight: 700, 
+              color: modernColors.secondary,
+              letterSpacing: '-0.01em',
+              mb: 0.5
+            }}>
+              {new Set(giacenzeFiltrate.map(g => g.articolo_nome)).size}
+            </Typography>
+            <Typography variant="caption" sx={{ 
+              color: modernColors.textSecondary,
+              fontWeight: 500,
+              fontSize: '0.75rem'
+            }}>
+              Articoli diversi
+            </Typography>
+          </Box>
         </Grid>
       </Grid>
 
-      {/* Filtri */}
-      <Paper sx={{ p: 3, mb: 3, border: '1px solid', borderColor: 'grey.300' }}>
+      {/* Filtri moderni */}
+      <Box sx={{ 
+        p: 3, 
+        mb: 3, 
+        borderRadius: '16px',
+        background: modernColors.glass,
+        backdropFilter: 'blur(15px)',
+        border: `1px solid ${modernColors.border}`,
+        boxShadow: '0 4px 20px rgba(16, 185, 129, 0.06)',
+        position: 'relative',
+        overflow: 'hidden',
+
+      }}>
         <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Search Bar */}
           <TextField
             placeholder="Cerca per articolo, gruppo, prodotto, colore, fornitore..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ flexGrow: 1, minWidth: 300 }}
+            sx={{ 
+              flexGrow: 1, 
+              minWidth: 300,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: modernColors.primary,
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: modernColors.primary,
+                  boxShadow: `0 0 0 2px ${modernColors.primary}20`
+                }
+              }
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ color: 'grey.500' }} />
+                  <SearchIcon sx={{ color: modernColors.textSecondary }} />
                 </InputAdornment>
               ),
               endAdornment: searchTerm && (
@@ -471,7 +629,12 @@ const GiacenzeMagazzino: React.FC = () => {
                   <IconButton 
                     onClick={() => setSearchTerm('')}
                     size="small"
-                    sx={{ '&:hover': { color: 'error.main' } }}
+                    sx={{ 
+                      '&:hover': { 
+                        color: modernColors.error,
+                        background: `${modernColors.error}10`
+                      } 
+                    }}
                   >
                     <ClearIcon />
                   </IconButton>
@@ -481,8 +644,20 @@ const GiacenzeMagazzino: React.FC = () => {
           />
 
           {/* Filtro Gruppo */}
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Gruppo</InputLabel>
+          <FormControl sx={{ 
+            minWidth: 150,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '12px',
+              background: 'rgba(255, 255, 255, 0.9)',
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: modernColors.primary,
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: modernColors.primary,
+              }
+            }
+          }}>
+            <InputLabel sx={{ color: modernColors.textSecondary, fontWeight: 500 }}>Gruppo</InputLabel>
             <Select
               value={gruppoFilter}
               onChange={(e) => setGruppoFilter(e.target.value)}
@@ -497,37 +672,123 @@ const GiacenzeMagazzino: React.FC = () => {
             </Select>
           </FormControl>
         </Box>
-      </Paper>
+      </Box>
 
-      {/* Tabella Giacenze */}
-      <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'grey.300' }}>
+      {/* Tabella Giacenze moderna */}
+      <Box sx={{ 
+        borderRadius: '16px',
+        background: modernColors.glass,
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${modernColors.border}`,
+        boxShadow: '0 4px 20px rgba(16, 185, 129, 0.06)',
+        overflow: 'hidden',
+        position: 'relative',
+
+      }}>
         <Table>
           <TableHead>
-            <TableRow sx={{ bgcolor: 'grey.50' }}>
-              <TableCell sx={{ fontWeight: 600 }}>Articolo</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Fornitore</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Quantità</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>
+            <TableRow sx={{ 
+              background: `linear-gradient(135deg, ${modernColors.primary}08, ${modernColors.secondary}08)`,
+              backdropFilter: 'blur(10px)',
+            }}>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Articolo
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Fornitore
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Quantità
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
                 <Box>
                   Costo/Stelo
-                  <Typography variant="caption" color="grey.600" sx={{ display: 'block' }}>
+                  <Typography variant="caption" sx={{ 
+                    display: 'block',
+                    color: modernColors.textSecondary,
+                    fontSize: '0.7rem'
+                  }}>
                     (con costi spalmati)
                   </Typography>
                 </Box>
               </TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Prezzi Vendita</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Prezzi Vendita
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
                 <Box>
                   Margine
-                  <Typography variant="caption" color="grey.600" sx={{ display: 'block' }}>
+                  <Typography variant="caption" sx={{ 
+                    display: 'block',
+                    color: modernColors.textSecondary,
+                    fontSize: '0.7rem'
+                  }}>
                     (prezzo 1)
                   </Typography>
                 </Box>
               </TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Valore Tot.</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Giorni</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Fattura</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Azioni</TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Valore Tot.
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Giorni
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Fattura
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
+                Azioni
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -662,7 +923,7 @@ const GiacenzeMagazzino: React.FC = () => {
             ))}
           </TableBody>
         </Table>
-      </Paper>
+      </Box>
 
       {/* Dialog Modifica Imballo */}
       <Dialog open={dialogImballoOpen} onClose={chiudiDialogImballo} maxWidth="sm" fullWidth>

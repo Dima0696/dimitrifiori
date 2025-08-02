@@ -42,6 +42,7 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
   Receipt as ReceiptIcon,
+  ReceiptLong as ReceiptLongIcon,
   Save as SaveIcon,
   Cancel as CancelIcon,
   ExpandMore as ExpandMoreIcon,
@@ -137,62 +138,79 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function InserimentoFattureMultiRiga() {
-  // === STILI iOS 18 MODERNI ===
+  // === STILI iOS 18 MODERNI CON ACCENTI COLORATI ===
   const modernStyles = {
-    // Colori
+    // Colori con accenti strategici
     colors: {
-      primary: '#667eea',
-      secondary: '#764ba2',
-      success: '#4CAF50',
-      error: '#f44336',
-      warning: '#ff9800',
-      text: '#2c3e50'
+      primary: '#3b82f6',      // Blue moderno
+      secondary: '#10b981',    // Emerald
+      accent1: '#f59e0b',      // Amber
+      accent2: '#8b5cf6',      // Violet
+      success: '#22c55e',      // Green
+      error: '#ef4444',        // Red
+      warning: '#f59e0b',      // Amber
+      text: '#1e293b',         // Slate
+      textSecondary: '#64748b', // Slate secondary
+      background: 'rgba(255, 255, 255, 0.95)',
+      glass: 'rgba(255, 255, 255, 0.8)',
+      border: 'rgba(59, 130, 246, 0.2)',
     },
     
-    // Glassmorphism principale
+    // Glassmorphism principale pulito
     glassmorphic: {
-      background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
+      background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.9) 100%)',
       backdropFilter: 'blur(20px)',
-      borderRadius: '24px',
-      border: '1px solid rgba(255,255,255,0.2)',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+      borderRadius: '10px',
+      border: '1px solid rgba(59, 130, 246, 0.15)',
+      boxShadow: '0 2px 12px rgba(59, 130, 246, 0.04)',
     },
     
-    // Container principale
+    // Container principale neutro
     mainContainer: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
       minHeight: '100vh',
-      padding: '20px',
+      padding: '12px',
     },
     
-    // Card articoli con effetto iOS
+    // Card articoli pulite
     articleCard: {
       background: 'rgba(255,255,255,0.95)',
-      backdropFilter: 'blur(20px)',
-      borderRadius: '20px',
-      border: '1px solid rgba(255,255,255,0.3)',
-      boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+      backdropFilter: 'blur(15px)',
+      borderRadius: '8px',
+      border: '1px solid rgba(148, 163, 184, 0.2)',
+      boxShadow: '0 1px 8px rgba(0,0,0,0.03)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       '&:hover': {
-        transform: 'translateY(-4px)',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        transform: 'translateY(-1px)',
+        boxShadow: '0 2px 12px rgba(59, 130, 246, 0.08)',
+        border: '1px solid rgba(59, 130, 246, 0.2)',
       }
+    },
+    
+    // Sezioni pulite
+    sectionCard: {
+      background: 'rgba(255,255,255,0.9)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '6px',
+      border: '1px solid rgba(148, 163, 184, 0.15)',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+      transition: 'all 0.3s ease',
     },
     
     // Componenti
     components: {
       input: {
-        borderRadius: '16px',
+        borderRadius: '8px',
         backgroundColor: 'rgba(255,255,255,0.9)',
         backdropFilter: 'blur(10px)',
         transition: 'all 0.3s ease',
         '&:hover': {
           backgroundColor: 'rgba(255,255,255,1)',
-          transform: 'scale(1.02)',
+          transform: 'scale(1.01)',
         },
         '&.Mui-focused': {
           backgroundColor: 'rgba(255,255,255,1)',
-          boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
+          boxShadow: '0 2px 12px rgba(102, 126, 234, 0.2)',
         }
       },
       glass: {
@@ -205,54 +223,96 @@ export default function InserimentoFattureMultiRiga() {
     // Input fields moderni
     modernInput: {
       '& .MuiOutlinedInput-root': {
-        borderRadius: '16px',
+        borderRadius: '8px',
         backgroundColor: 'rgba(255,255,255,0.9)',
         backdropFilter: 'blur(10px)',
         transition: 'all 0.3s ease',
         '&:hover': {
           backgroundColor: 'rgba(255,255,255,1)',
-          transform: 'scale(1.02)',
+          transform: 'scale(1.01)',
         },
         '&.Mui-focused': {
           backgroundColor: 'rgba(255,255,255,1)',
-          boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
+          boxShadow: '0 2px 12px rgba(59, 130, 246, 0.2)',
         }
       },
       '& .MuiInputLabel-root': {
-        fontWeight: 600,
-        color: '#667eea',
+        fontWeight: 500,
+        color: '#3b82f6',
+        fontSize: '0.875rem'
       }
     },
     
-    // Bottoni iOS style
+    // Bottoni moderni con accenti colorati
     primaryButton: {
-      borderRadius: '16px',
-      padding: '12px 24px',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      borderRadius: '8px',
+      padding: '6px 16px',
+      background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
       textTransform: 'none',
       fontWeight: 600,
-      fontSize: '16px',
-      boxShadow: '0 4px 20px rgba(102, 126, 234, 0.4)',
+      fontSize: '0.875rem',
+      boxShadow: '0 2px 8px rgba(59, 130, 246, 0.2)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       '&:hover': {
-        transform: 'translateY(-2px)',
-        boxShadow: '0 8px 30px rgba(102, 126, 234, 0.6)',
+        transform: 'translateY(-1px)',
+        boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
       }
     },
     
-    // Tab stile iOS
-    modernTab: {
-      borderRadius: '16px',
-      margin: '0 4px',
+    // Bottoni secondari con colori diversi
+    secondaryButton: {
+      borderRadius: '8px',
+      padding: '6px 16px',
+      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
       textTransform: 'none',
       fontWeight: 600,
-      transition: 'all 0.3s ease',
-      '&.Mui-selected': {
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        color: '#667eea',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+      fontSize: '0.875rem',
+      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      '&:hover': {
+        transform: 'translateY(-1px)',
+        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
       }
-    }
+    },
+    
+    // Bottoni di warning
+    warningButton: {
+      borderRadius: '8px',
+      padding: '6px 16px',
+      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+      textTransform: 'none',
+      fontWeight: 600,
+      fontSize: '0.875rem',
+      boxShadow: '0 2px 8px rgba(245, 158, 11, 0.2)',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      '&:hover': {
+        transform: 'translateY(-1px)',
+        boxShadow: '0 4px 16px rgba(245, 158, 11, 0.3)',
+      }
+    },
+    
+    // Tab pulite e moderne
+    modernTab: {
+      borderRadius: '6px',
+      margin: '0 1px',
+      textTransform: 'none',
+      fontWeight: 500,
+      fontSize: '0.825rem',
+      transition: 'all 0.3s ease',
+      color: '#64748b',
+      minHeight: '32px',
+      '&.Mui-selected': {
+        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+        color: '#3b82f6',
+        fontWeight: 600,
+      },
+      '&:hover': {
+        backgroundColor: 'rgba(59, 130, 246, 0.04)',
+        color: '#3b82f6',
+      }
+    },
+
   };
 
   const [fornitori, setFornitori] = useState<any[]>([]);
@@ -1518,9 +1578,12 @@ export default function InserimentoFattureMultiRiga() {
         <FormControl fullWidth sx={modernStyles.modernInput}>
           <InputLabel>🏢 Fornitore</InputLabel>
           <Select
-            value={formData.id_fornitore}
+            value={formData.id_fornitore || ""}
             onChange={(e) => setFormData({...formData, id_fornitore: Number(e.target.value)})}
           >
+            <MenuItem value="">
+              <em>Seleziona fornitore...</em>
+            </MenuItem>
             {fornitori.map((fornitore) => (
               <MenuItem key={fornitore.id} value={fornitore.id}>
                 {fornitore.nome}
@@ -1559,7 +1622,7 @@ export default function InserimentoFattureMultiRiga() {
 
   const renderRigaArticolo = (riga: RigaFattura, index: number) => (
     <Card sx={modernStyles.articleCard}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: 2 }}>
         <Box sx={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -1606,9 +1669,12 @@ export default function InserimentoFattureMultiRiga() {
               <FormControl fullWidth sx={modernStyles.modernInput}>
                 <InputLabel>🏷️ Gruppo</InputLabel>
                 <Select
-                  value={riga.id_gruppo}
+                  value={riga.id_gruppo || ""}
                   onChange={(e) => updateRiga(index, 'id_gruppo', Number(e.target.value))}
                 >
+                  <MenuItem value="">
+                    <em>Seleziona gruppo...</em>
+                  </MenuItem>
                   {gruppi.map((gruppo) => (
                     <MenuItem key={gruppo.id} value={gruppo.id}>
                       {gruppo.nome}
@@ -1632,9 +1698,12 @@ export default function InserimentoFattureMultiRiga() {
               <FormControl fullWidth sx={modernStyles.modernInput}>
                 <InputLabel>🎨 Colore</InputLabel>
                 <Select
-                  value={riga.id_colore}
+                  value={riga.id_colore || ""}
                   onChange={(e) => updateRiga(index, 'id_colore', Number(e.target.value))}
                 >
+                  <MenuItem value="">
+                    <em>Seleziona colore...</em>
+                  </MenuItem>
                   {colori.map((colore) => (
                     <MenuItem key={colore.id} value={colore.id}>
                       {colore.nome}
@@ -1648,9 +1717,12 @@ export default function InserimentoFattureMultiRiga() {
           <FormControl fullWidth sx={modernStyles.modernInput}>
             <InputLabel>🌍 Provenienza</InputLabel>
             <Select
-              value={riga.id_provenienza}
+              value={riga.id_provenienza || ""}
               onChange={(e) => updateRiga(index, 'id_provenienza', Number(e.target.value))}
             >
+              <MenuItem value="">
+                <em>Seleziona provenienza...</em>
+              </MenuItem>
               {provenienze.map((provenienza) => (
                 <MenuItem key={provenienza.id} value={provenienza.id}>
                   {provenienza.nome}
@@ -1665,9 +1737,12 @@ export default function InserimentoFattureMultiRiga() {
             <FormControl fullWidth sx={modernStyles.modernInput}>
               <InputLabel>📷 Foto</InputLabel>
               <Select
-                value={riga.id_foto}
+                value={riga.id_foto || ""}
                 onChange={(e) => updateRiga(index, 'id_foto', Number(e.target.value))}
               >
+                <MenuItem value="">
+                  <em>Seleziona foto...</em>
+                </MenuItem>
                 {foto.map((f) => (
                   <MenuItem key={f.id} value={f.id}>
                     {f.nome}
@@ -1694,10 +1769,13 @@ export default function InserimentoFattureMultiRiga() {
           <FormControl fullWidth sx={modernStyles.modernInput}>
             <InputLabel>📦 Imballo</InputLabel>
             <Select
-              value={riga.id_imballo}
+              value={riga.id_imballo || ""}
               onChange={(e) => updateRiga(index, 'id_imballo', Number(e.target.value))}
             >
-                              {imballaggi.map((imballo) => (
+              <MenuItem value="">
+                <em>Seleziona imballo...</em>
+              </MenuItem>
+              {imballaggi.map((imballo) => (
                   <MenuItem key={imballo.id} value={imballo.id}>
                     {imballo.quantita}
                   </MenuItem>
@@ -1710,9 +1788,12 @@ export default function InserimentoFattureMultiRiga() {
           <FormControl fullWidth sx={modernStyles.modernInput}>
             <InputLabel>📏 Altezza</InputLabel>
             <Select
-              value={riga.id_altezza}
+              value={riga.id_altezza || ""}
               onChange={(e) => updateRiga(index, 'id_altezza', Number(e.target.value))}
             >
+              <MenuItem value="">
+                <em>Seleziona altezza...</em>
+              </MenuItem>
               {altezze.map((altezza) => (
                 <MenuItem key={altezza.id} value={altezza.id}>
                   {altezza.descrizione || `${altezza.altezza_cm}cm`}
@@ -1726,9 +1807,12 @@ export default function InserimentoFattureMultiRiga() {
           <FormControl fullWidth sx={modernStyles.modernInput}>
             <InputLabel>⭐ Qualità</InputLabel>
             <Select
-              value={riga.id_qualita}
+              value={riga.id_qualita || ""}
               onChange={(e) => updateRiga(index, 'id_qualita', Number(e.target.value))}
             >
+              <MenuItem value="">
+                <em>Seleziona qualità...</em>
+              </MenuItem>
               {qualita.map((q) => (
                 <MenuItem key={q.id} value={q.id}>
                   {q.nome}
@@ -1792,7 +1876,7 @@ export default function InserimentoFattureMultiRiga() {
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#28a745', mb: 1 }}>
                   📊 Informazioni Magazzino
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">Giacenza Attuale</Typography>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -2103,7 +2187,7 @@ export default function InserimentoFattureMultiRiga() {
           return (
             <Grid item xs={12} key={index}>
               <Card sx={modernStyles.articleCard}>
-                <CardContent sx={{ p: 3 }}>
+                <CardContent sx={{ p: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
                     <Chip 
                       label={`#${index + 1}`}
@@ -2157,6 +2241,12 @@ export default function InserimentoFattureMultiRiga() {
                           };
                           setFormData({...formData, prezzi_vendita: nuoviPrezzi});
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            setTimeout(() => calcolaPrezziVendita(), 0);
+                          }
+                        }}
                         InputProps={{ endAdornment: '%' }}
                         sx={modernStyles.modernInput}
                       />
@@ -2181,6 +2271,12 @@ export default function InserimentoFattureMultiRiga() {
                           };
                           setFormData({...formData, prezzi_vendita: nuoviPrezzi});
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            setTimeout(() => calcolaPrezziVendita(), 0);
+                          }
+                        }}
                         InputProps={{ endAdornment: '%' }}
                         sx={modernStyles.modernInput}
                       />
@@ -2204,6 +2300,12 @@ export default function InserimentoFattureMultiRiga() {
                             percentuale_ricarico_3: Number(e.target.value)
                           };
                           setFormData({...formData, prezzi_vendita: nuoviPrezzi});
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            setTimeout(() => calcolaPrezziVendita(), 0);
+                          }
                         }}
                         InputProps={{ endAdornment: '%' }}
                         sx={modernStyles.modernInput}
@@ -2272,13 +2374,14 @@ export default function InserimentoFattureMultiRiga() {
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
       <Paper sx={{ ...modernStyles.glassmorphic, mb: 3 }}>
-        <Box sx={{ p: 4 }}>
+        <Box sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
             <ReceiptIcon sx={{ fontSize: 40, color: '#667eea', mr: 2 }} />
             <Typography 
-              variant="h4" 
+              variant="h5" 
               sx={{ 
-                fontWeight: 700, 
+                fontWeight: 600, 
+                fontSize: '1.4rem',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
@@ -2290,14 +2393,14 @@ export default function InserimentoFattureMultiRiga() {
           </Box>
 
           {/* NUOVO: Sezione Filtri */}
-          <Card sx={{ mb: 4, borderRadius: '16px', backgroundColor: 'rgba(255,255,255,0.9)' }}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" sx={{ mb: 3, color: '#667eea', fontWeight: 700 }}>
+          <Card sx={{ mb: 2, borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.9)' }}>
+            <CardContent sx={{ p: 2 }}>
+              <Typography variant="h6" sx={{ mb: 2, color: '#667eea', fontWeight: 600, fontSize: '1.1rem' }}>
                 <FilterIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                 Filtri di Ricerca
               </Typography>
               
-              <Grid container spacing={3}>
+              <Grid container spacing={2}>
                 <Grid item xs={12} sm={6} md={3}>
                   <TextField
                     fullWidth
@@ -2360,7 +2463,7 @@ export default function InserimentoFattureMultiRiga() {
                 </Grid>
               </Grid>
               
-              <Grid container spacing={2} sx={{ mt: 2 }}>
+              <Grid container spacing={2} sx={{ mt: 1.5 }}>
                 <Grid item xs={12} sm={6} md={4}>
                   <TextField
                     fullWidth
@@ -2381,7 +2484,7 @@ export default function InserimentoFattureMultiRiga() {
                       fontWeight: 600,
                       borderColor: '#667eea',
                       color: '#667eea',
-                      height: '56px'
+                      height: '40px'
                     }}
                     fullWidth
                   >
@@ -2416,7 +2519,7 @@ export default function InserimentoFattureMultiRiga() {
           </Card>
 
           {fattureFiltrate.length === 0 ? (
-            <Alert severity="info" sx={{ borderRadius: '16px' }}>
+            <Alert severity="info" sx={{ borderRadius: '10px' }}>
               <Typography sx={{ fontWeight: 600 }}>
                 {fattureEsistenti.length === 0 
                   ? "Nessun documento di carico trovato. Crea il primo documento!" 
@@ -2425,7 +2528,7 @@ export default function InserimentoFattureMultiRiga() {
               </Typography>
             </Alert>
           ) : (
-            <Grid container spacing={3}>
+            <Grid container spacing={2}>
               {fattureFiltrate.map((fattura, index) => (
                 <Grid item xs={12} sm={6} md={4} key={fattura.id || index}>
                   <motion.div
@@ -2438,9 +2541,9 @@ export default function InserimentoFattureMultiRiga() {
                       height: '100%',
                       cursor: 'pointer'
                     }}>
-                      <CardContent sx={{ p: 3 }}>
+                      <CardContent sx={{ p: 2 }}>
                         {/* Header documento */}
-                        <Box sx={{ mb: 3 }}>
+                        <Box sx={{ mb: 2 }}>
                           <Typography variant="h6" sx={{ 
                             fontWeight: 700, 
                             color: '#2c3e50',
@@ -2455,7 +2558,7 @@ export default function InserimentoFattureMultiRiga() {
                         </Box>
 
                         {/* Dettagli fornitore */}
-                        <Box sx={{ mb: 3 }}>
+                        <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" color="text.secondary">
                             🏢 Fornitore:
                           </Typography>
@@ -2465,7 +2568,7 @@ export default function InserimentoFattureMultiRiga() {
                         </Box>
 
                         {/* Articoli */}
-                        <Box sx={{ mb: 3 }}>
+                        <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" color="text.secondary">
                             🌺 Articoli:
                           </Typography>
@@ -2483,17 +2586,18 @@ export default function InserimentoFattureMultiRiga() {
 
                         {/* Importi */}
                         <Box sx={{ 
-                          p: 2,
-                          borderRadius: '12px',
+                          p: 1.5,
+                          borderRadius: '8px',
                           background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
                           border: '1px solid rgba(102, 126, 234, 0.2)',
-                          mb: 3
+                          mb: 2
                         }}>
                           <Typography variant="body2" color="text.secondary">
                             💰 Totale:
                           </Typography>
                           <Typography variant="h6" sx={{ 
-                            fontWeight: 700,
+                            fontWeight: 600,
+                            fontSize: '1.1rem',
                             color: '#667eea'
                           }}>
                             €{fattura.totale_fattura?.toFixed(2) || '0.00'}
@@ -2501,7 +2605,7 @@ export default function InserimentoFattureMultiRiga() {
                         </Box>
 
                         {/* Stato */}
-                        <Box sx={{ mb: 3 }}>
+                        <Box sx={{ mb: 2 }}>
                           <Chip 
                             label={fattura.stato_fattura || 'bozza'}
                             color={
@@ -2537,13 +2641,13 @@ export default function InserimentoFattureMultiRiga() {
                             startIcon={<DeleteIcon />}
                             onClick={() => handleEliminaFattura(fattura)}
                             sx={{
-                              borderRadius: '12px',
+                              borderRadius: '8px',
                               textTransform: 'none',
                               fontWeight: 600,
                               fontSize: '0.875rem',
-                              py: 1,
+                              py: 0.8,
                               minWidth: 'auto',
-                              px: 2
+                              px: 1.5
                             }}
                           >
                             🗑️
@@ -2574,62 +2678,50 @@ export default function InserimentoFattureMultiRiga() {
           transition={{ duration: 0.4, delay: 0.2 }}
         >
           <Paper sx={modernStyles.glassmorphic}>
-            <Box sx={{ p: 4 }}>
+            <Box sx={{ p: 2 }}>
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-                  <InventoryIcon sx={{ fontSize: 40, color: '#667eea', mr: 2 }} />
-                  <Typography 
-                    variant="h3" 
-                    sx={{ 
-                      fontWeight: 700, 
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      fontSize: { xs: '1.8rem', md: '2.5rem' }
-                    }}
-                  >
-                    Gestione Fatture Avanzata
-                  </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <ReceiptLongIcon sx={{ fontSize: 24, color: modernStyles.colors.primary, mr: 1.5 }} />
+                  <Box>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 600, 
+                        color: modernStyles.colors.text,
+                        fontSize: '1.2rem',
+                        letterSpacing: '-0.01em',
+                        mb: 0.5
+                      }}
+                    >
+                      Fatture Acquisti
+                    </Typography>
+                    <Typography variant="body2" sx={{ 
+                      color: modernStyles.colors.textSecondary,
+                      fontWeight: 500,
+                      fontSize: '0.875rem'
+                    }}>
+                      Gestione completa delle fatture di acquisto con 8 caratteristiche per articolo
+                    </Typography>
+                  </Box>
                 </Box>
-              </motion.div>
-              
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-              >
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    mb: 4,
-                    borderRadius: '16px',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                    border: '1px solid rgba(102, 126, 234, 0.2)',
-                    '& .MuiAlert-icon': { color: '#667eea' }
-                  }}
-                >
-                  <Typography sx={{ fontWeight: 600 }}>
-                    Sistema completo con 8 caratteristiche per articolo, gestione costi analitici e prezzi multipli
-                  </Typography>
-                </Alert>
               </motion.div>
 
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.5 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                style={{ marginTop: '16px' }}
               >
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={handleOpenDialog}
                   sx={modernStyles.primaryButton}
-                  size="large"
+                  size="medium"
                 >
                   Crea Nuova Fattura
                 </Button>
@@ -2672,7 +2764,7 @@ export default function InserimentoFattureMultiRiga() {
               }}
             >
               <ReceiptIcon sx={{ mr: 2, fontSize: 28 }} />
-              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              <Typography component="span" variant="h5" sx={{ fontWeight: 700 }}>
                 {modalitaModifica 
                   ? `✏️ Modifica Fattura: ${formData.numero_fattura}`
                   : '➕ Nuova Fattura con Carico Multi-Riga'
@@ -2706,7 +2798,7 @@ export default function InserimentoFattureMultiRiga() {
                 </Tabs>
               </Box>
               
-              <Box sx={{ p: 4 }}>
+              <Box sx={{ p: 3 }}>
                 <TabPanel value={activeTab} index={0}>
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
@@ -2785,7 +2877,7 @@ export default function InserimentoFattureMultiRiga() {
               </Box>
             </DialogContent>
             
-            <DialogActions sx={{ p: 3, bgcolor: 'rgba(255,255,255,0.8)', borderRadius: '0 0 24px 24px' }}>
+            <DialogActions sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.8)', borderRadius: '0 0 16px 16px' }}>
               <Button 
                 onClick={handleCloseDialog} 
                 startIcon={<CancelIcon />}
@@ -2827,7 +2919,7 @@ export default function InserimentoFattureMultiRiga() {
           </DialogTitle>
           
           <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
               
               {/* Area upload file */}
               <Box>
@@ -2923,7 +3015,7 @@ export default function InserimentoFattureMultiRiga() {
           </DialogTitle>
           
           <DialogContent sx={{ pt: 3 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               
               {/* Info fattura */}
               {fatturaToDelete && (
