@@ -31,7 +31,6 @@ dist-ssr
 # File obsoleti che si rigenerano automaticamente - IGNORALI
 src/components/ListaClienti.tsx
 src/components/GestioneFornitori.tsx
-src/components/GestioneAcquisti.tsx
 src/components/GestioneFattureVendita.tsx
 src/components/GestioneProdotti.tsx
 src/components/GestioneVarieta.tsx
