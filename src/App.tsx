@@ -13,6 +13,7 @@ import GestioneFornitori from './components/anagrafica/GestioneFornitori';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GestioneMagazzino from './components/GestioneMagazzino';
+import GestioneAcquisti from './components/GestioneAcquisti';
 import TestApiService from './components/TestApiService';
 import Anagrafica from './components/Anagrafica';
 import modernTheme from './styles/modernTheme';
@@ -50,7 +51,8 @@ function App() {
                 {/* Fornitori */}
                 <Route path="/fornitori" element={<ProtectedRoute><MainLayout title="Gestione Fornitori"><GestioneFornitori /></MainLayout></ProtectedRoute>} />
                 
-                
+                {/* Gestione Acquisti */}
+                <Route path="/acquisti" element={<ProtectedRoute><MainLayout title="Gestione Acquisti"><GestioneAcquisti /></MainLayout></ProtectedRoute>} />
                 
                 {/* Test API */}
                 <Route path="/test-api" element={<ProtectedRoute><MainLayout title="Test API Service"><TestApiService /></MainLayout></ProtectedRoute>} />

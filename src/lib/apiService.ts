@@ -140,7 +140,7 @@ export interface Cliente {
 
 export interface MovimentoMagazzino {
   id: number;
-  tipo: 'carico' | 'scarico' | 'distruzione' | 'inventario' | 'trasferimento';
+  tipo: 'carico' | 'scarico' | 'distruzione' | 'inventario' | 'trasferimento' | 'carico_virtuale';
   data: string;
   quantita: number;
   prezzo_unitario?: number;
@@ -163,6 +163,7 @@ export interface MovimentoMagazzino {
   fornitore_nome?: string;
   cliente_id?: number;
   cliente_nome?: string;
+  ordine_acquisto_id?: number;  // NUOVO: riferimento agli ordini acquisto
   
   // Metadati
   note?: string;
@@ -179,6 +180,147 @@ export interface MovimentoMagazzino {
   imballo_nome?: string;
   altezza_nome?: string;
   qualita_nome?: string;
+}
+
+// =========================================================================
+// INTERFACCE ORDINI ACQUISTO E GIACENZE VIRTUALI
+// =========================================================================
+
+export interface OrdineAcquisto {
+  id: number;
+  numero_ordine: string;
+  data_ordine: string;
+  data_consegna_prevista: string;
+  fornitore_id: number;
+  stato: 'ordinato' | 'consegnato';
+  totale_ordine: number;
+  
+  // Costi analitici
+  costo_trasporto: number;
+  id_fornitore_trasporto?: number;
+  costo_commissioni: number;
+  id_fornitore_commissioni?: number;
+  costo_imballaggi: number;
+  id_fornitore_imballaggi?: number;
+  note_costi?: string;
+  
+  note?: string;
+  utente_creazione?: string;
+  created_at: string;
+  updated_at: string;
+  data_consegna_effettiva?: string;
+  fattura_generata_id?: number;
+}
+
+export interface GiacenzaVirtuale {
+  id: number;
+  ordine_acquisto_id: number;
+  
+  // Caratteristiche articolo (8 campi)
+  gruppo_id: number;
+  nome_prodotto: string;
+  colore_id: number;
+  provenienza_id: number;
+  foto_id: number;
+  imballo_id: number;
+  altezza_id: number;
+  qualita_id: number;
+  
+  // Quantità e prezzi
+  quantita: number;
+  prezzo_acquisto_per_stelo: number;
+  costi_spalmare_per_stelo: number;
+  prezzo_costo_finale_per_stelo: number;
+  prezzo_vendita_1: number;
+  prezzo_vendita_2: number;
+  prezzo_vendita_3: number;
+  totale_riga: number;
+  totale_con_costi: number;
+  
+  note?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrdineAcquistoCompleto {
+  id: number;
+  numero_ordine: string;
+  data_ordine: string;
+  data_consegna_prevista: string;
+  stato: 'ordinato' | 'consegnato';
+  totale_ordine: number;
+  note?: string;
+  created_at: string;
+  data_consegna_effettiva?: string;
+  fattura_generata_id?: number;
+  
+  // Costi analitici
+  costo_trasporto: number;
+  costo_commissioni: number;
+  costo_imballaggi: number;
+  totale_costi_analitici: number;
+  
+  // Dati fornitore
+  fornitore_id: number;
+  fornitore_nome: string;
+  fornitore_piva?: string;
+  
+  // Conteggi righe
+  numero_righe: number;
+  quantita_totale: number;
+  giorni_alla_consegna: number;
+}
+
+export interface GiacenzaVirtualeCompleta {
+  giacenza_virtuale_id: number;
+  ordine_acquisto_id: number;
+  numero_ordine: string;
+  data_consegna_prevista: string;
+  stato_ordine: 'ordinato' | 'consegnato';
+  fornitore_nome: string;
+  
+  // Articolo virtuale
+  gruppo_nome: string;
+  prodotto_nome: string;
+  colore_nome: string;
+  provenienza_nome: string;
+  foto_nome?: string;
+  foto_url?: string;
+  imballo_nome: string;
+  altezza_cm: number;
+  qualita_nome: string;
+  
+  // Dati giacenza virtuale
+  quantita_virtuale: number;
+  prezzo_acquisto_per_stelo: number;
+  costi_spalmare_per_stelo: number;
+  prezzo_costo_finale_per_stelo: number;
+  prezzo_vendita_1: number;
+  prezzo_vendita_2: number;
+  prezzo_vendita_3: number;
+  valore_giacenza_base: number;
+  valore_giacenza_finale: number;
+  
+  // Calcoli valori di vendita potenziali
+  valore_vendita_1: number;
+  valore_vendita_2: number;
+  valore_vendita_3: number;
+  
+  // Margini
+  margine_per_stelo_1: number;
+  margine_per_stelo_2: number;
+  margine_per_stelo_3: number;
+  markup_percentuale_1: number;
+  markup_percentuale_2: number;
+  markup_percentuale_3: number;
+  margine_totale_1: number;
+  margine_totale_2: number;
+  margine_totale_3: number;
+  
+  tipo_giacenza: 'virtuale';
+  giorni_alla_consegna: number;
+  note?: string;
+  data_ordine: string;
 }
 
 // =========================================================================
@@ -2725,6 +2867,386 @@ class ApiService {
         errors: ['Errore durante la validazione']
       };
     }
+  }
+
+  // =========================================================================
+  // === ORDINI ACQUISTO ===
+  // =========================================================================
+
+  /**
+   * Ottiene tutti gli ordini acquisto con informazioni complete
+   */
+  async getOrdiniAcquisto(stato?: 'ordinato' | 'consegnato'): Promise<OrdineAcquistoCompleto[]> {
+    let query = supabase
+      .from('view_ordini_acquisto_completi')
+      .select('*');
+    
+    if (stato) {
+      query = query.eq('stato', stato);
+    }
+    
+    const { data, error } = await query.order('data_consegna_prevista', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Ottiene un singolo ordine acquisto per ID
+   */
+  async getOrdineAcquisto(id: number): Promise<OrdineAcquisto> {
+    const { data, error } = await supabase
+      .from('ordini_acquisto')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Crea un nuovo ordine acquisto
+   */
+  async createOrdineAcquisto(ordine: Omit<OrdineAcquisto, 'id' | 'numero_ordine' | 'created_at' | 'updated_at'>): Promise<OrdineAcquisto> {
+    const { data, error } = await supabase
+      .from('ordini_acquisto')
+      .insert([ordine])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Aggiorna un ordine acquisto esistente
+   */
+  async updateOrdineAcquisto(id: number, ordine: Partial<Omit<OrdineAcquisto, 'id' | 'numero_ordine' | 'created_at' | 'updated_at'>>): Promise<OrdineAcquisto> {
+    const { data, error } = await supabase
+      .from('ordini_acquisto')
+      .update(ordine)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Elimina un ordine acquisto (solo se in stato 'ordinato')
+   */
+  async deleteOrdineAcquisto(id: number): Promise<void> {
+    // Verifica che l'ordine sia in stato ordinato
+    const ordine = await this.getOrdineAcquisto(id);
+    if (ordine.stato !== 'ordinato') {
+      throw new Error('Impossibile eliminare un ordine già consegnato');
+    }
+
+    const { error } = await supabase
+      .from('ordini_acquisto')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  // =========================================================================
+  // === GIACENZE VIRTUALI ===
+  // =========================================================================
+
+  /**
+   * Ottiene tutte le giacenze virtuali complete
+   */
+  async getGiacenzeVirtuali(ordineId?: number): Promise<GiacenzaVirtualeCompleta[]> {
+    let query = supabase
+      .from('view_giacenze_virtuali_complete')
+      .select('*');
+    
+    if (ordineId) {
+      query = query.eq('ordine_acquisto_id', ordineId);
+    }
+    
+    const { data, error } = await query.order('data_consegna_prevista', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Ottiene le giacenze virtuali di un ordine specifico
+   */
+  async getGiacenzeVirtualiByOrdine(ordineId: number): Promise<GiacenzaVirtuale[]> {
+    const { data, error } = await supabase
+      .from('giacenze_virtuali')
+      .select('*')
+      .eq('ordine_acquisto_id', ordineId)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Crea una nuova giacenza virtuale
+   */
+  async createGiacenzaVirtuale(giacenza: Omit<GiacenzaVirtuale, 'id' | 'costi_spalmare_per_stelo' | 'prezzo_costo_finale_per_stelo' | 'totale_riga' | 'totale_con_costi' | 'created_at' | 'updated_at'>): Promise<GiacenzaVirtuale> {
+    const { data, error } = await supabase
+      .from('giacenze_virtuali')
+      .insert([giacenza])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Aggiorna una giacenza virtuale esistente
+   */
+  async updateGiacenzaVirtuale(id: number, giacenza: Partial<Omit<GiacenzaVirtuale, 'id' | 'costi_spalmare_per_stelo' | 'prezzo_costo_finale_per_stelo' | 'totale_riga' | 'totale_con_costi' | 'created_at' | 'updated_at'>>): Promise<GiacenzaVirtuale> {
+    const { data, error } = await supabase
+      .from('giacenze_virtuali')
+      .update(giacenza)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Elimina una giacenza virtuale
+   */
+  async deleteGiacenzaVirtuale(id: number): Promise<void> {
+    const { error } = await supabase
+      .from('giacenze_virtuali')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+
+  /**
+   * Aggiorna i costi spalmare per un ordine (trigger automatico quando si modificano i costi analitici)
+   */
+  async ricalcolaCostiOrdine(ordineId: number): Promise<void> {
+    const { error } = await supabase.rpc('aggiorna_costi_spalmare_ordine', {
+      ordine_id: ordineId
+    });
+    
+    if (error) throw error;
+  }
+
+  /**
+   * Trasforma un ordine acquisto in fattura di acquisto reale
+   * Questa è la funzione chiave quando clicchi "Consegnato"
+   */
+  async trasformaOrdineInFattura(ordineId: number, modificheConsegna?: {
+    dataConsegnaEffettiva?: string;
+    modificheGiacenze?: { giacenzaId: number; nuovaQuantita?: number; nuovoPrezzoAcquisto?: number }[];
+  }): Promise<{ fatturaId: number; numeroFattura: string }> {
+    try {
+      console.log('🔄 Inizio trasformazione ordine in fattura:', ordineId);
+
+      // 1. Ottieni ordine e giacenze virtuali
+      const ordine = await this.getOrdineAcquisto(ordineId);
+      const giacenzeVirtuali = await this.getGiacenzeVirtualiByOrdine(ordineId);
+
+      if (ordine.stato !== 'ordinato') {
+        throw new Error('Ordine già consegnato o in stato non valido');
+      }
+
+      // 2. Applica modifiche alle giacenze se presenti
+      if (modificheConsegna?.modificheGiacenze) {
+        for (const modifica of modificheConsegna.modificheGiacenze) {
+          await this.updateGiacenzaVirtuale(modifica.giacenzaId, {
+            quantita: modifica.nuovaQuantita,
+            prezzo_acquisto_per_stelo: modifica.nuovoPrezzoAcquisto
+          });
+        }
+      }
+
+      // 3. Crea la fattura di acquisto
+      const numeroFattura = `FAT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      const nuovaFattura = await this.createFatturaAcquisto({
+        numero: numeroFattura,
+        data: modificheConsegna?.dataConsegnaEffettiva || new Date().toISOString().split('T')[0],
+        fornitore_id: ordine.fornitore_id,
+        totale: ordine.totale_ordine,
+        stato: 'confermata',
+        note: `Generata automaticamente da ordine ${ordine.numero_ordine}`
+      });
+
+      // 4. Crea i costi analitici della fattura
+      if (ordine.costo_trasporto > 0) {
+        await supabase.from('costi_fattura').insert({
+          fattura_acquisto_id: nuovaFattura.id,
+          tipologia_costo_id: 1, // Assumendo ID 1 per trasporto
+          fornitore_costo_id: ordine.id_fornitore_trasporto || ordine.fornitore_id,
+          importo: ordine.costo_trasporto
+        });
+      }
+
+      if (ordine.costo_commissioni > 0) {
+        await supabase.from('costi_fattura').insert({
+          fattura_acquisto_id: nuovaFattura.id,
+          tipologia_costo_id: 2, // Assumendo ID 2 per commissioni
+          fornitore_costo_id: ordine.id_fornitore_commissioni || ordine.fornitore_id,
+          importo: ordine.costo_commissioni
+        });
+      }
+
+      if (ordine.costo_imballaggi > 0) {
+        await supabase.from('costi_fattura').insert({
+          fattura_acquisto_id: nuovaFattura.id,
+          tipologia_costo_id: 3, // Assumendo ID 3 per imballaggi
+          fornitore_costo_id: ordine.id_fornitore_imballaggi || ordine.fornitore_id,
+          importo: ordine.costo_imballaggi
+        });
+      }
+
+      // 5. Trasforma ogni giacenza virtuale in documento di carico
+      const giacenzeAggiornate = await this.getGiacenzeVirtualiByOrdine(ordineId);
+      
+      for (const giacenza of giacenzeAggiornate) {
+        // Crea o trova l'articolo corrispondente
+        const articolo = await this.trovaOCreaArticolo({
+          gruppo_id: giacenza.gruppo_id,
+          prodotto_nome: giacenza.nome_prodotto,
+          colore_id: giacenza.colore_id,
+          provenienza_id: giacenza.provenienza_id,
+          foto_id: giacenza.foto_id,
+          imballo_id: giacenza.imballo_id,
+          altezza_id: giacenza.altezza_id,
+          qualita_id: giacenza.qualita_id
+        });
+
+        // Crea documento di carico
+        await this.createDocumentoCarico({
+          fattura_acquisto_id: nuovaFattura.id,
+          articolo_id: articolo.id,
+          quantita: giacenza.quantita,
+          prezzo_acquisto_per_stelo: giacenza.prezzo_acquisto_per_stelo,
+          costi_spalmare_per_stelo: giacenza.costi_spalmare_per_stelo,
+          prezzo_vendita_1: giacenza.prezzo_vendita_1,
+          prezzo_vendita_2: giacenza.prezzo_vendita_2,
+          prezzo_vendita_3: giacenza.prezzo_vendita_3,
+          note: giacenza.note
+        });
+
+        // Crea movimento di magazzino
+        await this.createMovimentoMagazzino({
+          tipo: 'carico',
+          data: modificheConsegna?.dataConsegnaEffettiva || new Date().toISOString().split('T')[0],
+          quantita: giacenza.quantita,
+          prezzo_unitario: giacenza.prezzo_acquisto_per_stelo,
+          valore_totale: giacenza.totale_riga,
+          gruppo_id: giacenza.gruppo_id,
+          colore_id: giacenza.colore_id,
+          provenienza_id: giacenza.provenienza_id,
+          foto_id: giacenza.foto_id,
+          imballo_id: giacenza.imballo_id,
+          altezza_id: giacenza.altezza_id,
+          qualita_id: giacenza.qualita_id,
+          fattura_id: nuovaFattura.id,
+          fattura_numero: numeroFattura,
+          fornitore_id: ordine.fornitore_id,
+          note: `Da ordine acquisto ${ordine.numero_ordine}`,
+          ordine_acquisto_id: ordineId
+        });
+      }
+
+      // 6. Aggiorna lo stato dell'ordine
+      await this.updateOrdineAcquisto(ordineId, {
+        stato: 'consegnato',
+        data_consegna_effettiva: modificheConsegna?.dataConsegnaEffettiva || new Date().toISOString(),
+        fattura_generata_id: nuovaFattura.id
+      });
+
+      console.log('✅ Trasformazione completata:', { fatturaId: nuovaFattura.id, numeroFattura });
+      
+      return {
+        fatturaId: nuovaFattura.id,
+        numeroFattura: numeroFattura
+      };
+
+    } catch (error) {
+      console.error('❌ Errore trasformazione ordine in fattura:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Funzione helper per trovare o creare un articolo basato sulle caratteristiche
+   */
+  private async trovaOCreaArticolo(caratteristiche: {
+    gruppo_id: number;
+    prodotto_nome: string;
+    colore_id: number;
+    provenienza_id: number;
+    foto_id: number;
+    imballo_id: number;
+    altezza_id: number;
+    qualita_id: number;
+  }): Promise<Articolo> {
+    // Prima cerca se esiste già un prodotto con questo nome
+    let prodotto = await supabase
+      .from('prodotti')
+      .select('*')
+      .eq('nome', caratteristiche.prodotto_nome)
+      .single();
+
+    // Se non esiste, lo crea
+    if (prodotto.error) {
+      const { data: nuovoProdotto, error: erroreProdotto } = await supabase
+        .from('prodotti')
+        .insert([{ nome: caratteristiche.prodotto_nome }])
+        .select()
+        .single();
+      
+      if (erroreProdotto) throw erroreProdotto;
+      prodotto.data = nuovoProdotto;
+    }
+
+    // Ora cerca se esiste già un articolo con queste caratteristiche
+    let articolo = await supabase
+      .from('articoli')
+      .select('*')
+      .eq('gruppo_id', caratteristiche.gruppo_id)
+      .eq('prodotto_id', prodotto.data.id)
+      .eq('colore_id', caratteristiche.colore_id)
+      .eq('provenienza_id', caratteristiche.provenienza_id)
+      .eq('foto_id', caratteristiche.foto_id)
+      .eq('imballo_id', caratteristiche.imballo_id)
+      .eq('altezza_id', caratteristiche.altezza_id)
+      .eq('qualita_id', caratteristiche.qualita_id)
+      .single();
+
+    // Se non esiste, lo crea
+    if (articolo.error) {
+      const { data: nuovoArticolo, error: erroreArticolo } = await supabase
+        .from('articoli')
+        .insert([{
+          gruppo_id: caratteristiche.gruppo_id,
+          prodotto_id: prodotto.data.id,
+          colore_id: caratteristiche.colore_id,
+          provenienza_id: caratteristiche.provenienza_id,
+          foto_id: caratteristiche.foto_id,
+          imballo_id: caratteristiche.imballo_id,
+          altezza_id: caratteristiche.altezza_id,
+          qualita_id: caratteristiche.qualita_id
+        }])
+        .select()
+        .single();
+      
+      if (erroreArticolo) throw erroreArticolo;
+      articolo.data = nuovoArticolo;
+    }
+
+    return articolo.data;
   }
 }
 
