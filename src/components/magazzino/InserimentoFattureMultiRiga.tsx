@@ -168,13 +168,19 @@ interface InserimentoFattureMultiRigaProps {
   onClose?: () => void;
   modalitaIniziale?: 'fatture' | 'ordini';
   soloOrdini?: boolean; // Se true, nasconde tutto ciò che riguarda le fatture
+  ordineEsistente?: any; // Ordine da visualizzare/modificare
+  modalitaSolaLettura?: boolean; // Se true, rende il form in sola lettura
+  modalitaModificaOrdine?: boolean; // Se true, carica i dati dell'ordine per modifica
 }
 
 export default function InserimentoFattureMultiRiga({ 
   open = false, 
   onClose = () => {}, 
   modalitaIniziale = 'fatture',
-  soloOrdini = false
+  soloOrdini = false,
+  ordineEsistente = null,
+  modalitaSolaLettura = false,
+  modalitaModificaOrdine = false
 }: InserimentoFattureMultiRigaProps = {}) {
   // === STILI iOS 18 MODERNI (COLORI DEFINITI DOPO MODALITAORDINI) ===
   const modernStylesBase = {
@@ -1747,11 +1753,11 @@ export default function InserimentoFattureMultiRiga({
             stato: 'ordinato',
             note: ordineData.note,
             costo_trasporto: ordineData.costo_trasporto || 0,
-            id_fornitore_trasporto: ordineData.id_fornitore_trasporto,
+            id_fornitore_trasporto: ordineData.id_fornitore_trasporto || null,
             costo_commissioni: ordineData.costo_commissioni || 0,
-            id_fornitore_commissioni: ordineData.id_fornitore_commissioni,
+            id_fornitore_commissioni: ordineData.id_fornitore_commissioni || null,
             costo_imballaggi: ordineData.costo_imballaggi || 0,
-            id_fornitore_imballaggi: ordineData.id_fornitore_imballaggi,
+            id_fornitore_imballaggi: ordineData.id_fornitore_imballaggi || null,
             note_costi: ordineData.note_costi
           });
           
@@ -1784,7 +1790,7 @@ export default function InserimentoFattureMultiRiga({
           
           // 3. Crea movimenti di magazzino virtuali
           for (const riga of ordineData.righe) {
-            await apiService.createMovimentoMagazzino({
+            await apiService.creaMovimentoMagazzino({
               tipo: 'carico_virtuale',
               data: ordineData.data_ordine,
               quantita: riga.quantita,

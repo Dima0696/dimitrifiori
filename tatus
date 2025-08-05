@@ -1,5 +1,5 @@
-[33m049271c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Corretto calcolo imponibile in modifica fattura - calcolo da righe invece che da totale
-[33m77e93fe[m Corretto IVA dal 22% al 10% in InserimentoFattureMultiRiga
-[33m5e1781e[m  PULIZIA APPROFONDITA: Rimossi tutti i file inutilizzati
-[33ma0b2454[m  PULIZIA: Rimossi file obsoleti e duplicati
-[33ma369edb[m 💾 BACKUP: Progetto funzionante senza Cursor - pre-pulizia file obsoleti
+[33m7c6d7fb[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m sistema ordini acquisto
+[33m9430e54[m nuovo layout
+[33m1376960[m CORRETTO MAGAZZINO
+[33m24587b2[m 🌸 DISTRUZIONE E ANNULLAMENTO PERFETTI: Sistema completo per gestionale floricolo
+[33m95921ca[m 🚀 MIGRAZIONE COMPLETA: Nuovo sistema completo - sostituisce versione precedente

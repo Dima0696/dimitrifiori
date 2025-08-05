@@ -22,6 +22,7 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Dialog,
   alpha
 } from '@mui/material';
 import {
@@ -33,7 +34,8 @@ import {
   Visibility as ViewIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
-  FilterList as FilterIcon
+  FilterList as FilterIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiService } from '../lib/apiService';
@@ -74,6 +76,9 @@ export default function GestioneAcquisti() {
   const [filtroFornitore, setFiltroFornitore] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [dialogNuovoOrdine, setDialogNuovoOrdine] = useState(false);
+  const [dialogModificaOrdine, setDialogModificaOrdine] = useState(false);
+  const [dialogVisualizzaOrdine, setDialogVisualizzaOrdine] = useState(false);
+  const [ordineSelezionato, setOrdineSelezionato] = useState<OrdineAcquisto | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
   // Statistiche derivate
@@ -101,6 +106,73 @@ export default function GestioneAcquisti() {
       setSnackbar({
         open: true,
         message: 'Errore nel caricamento degli ordini acquisto',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===== CRUD FUNCTIONS =====
+  
+  const handleVisualizzaOrdine = async (ordine: OrdineAcquisto) => {
+    try {
+      setLoading(true);
+      const ordineCompleto = await apiService.getOrdineAcquisto(ordine.id);
+      setOrdineSelezionato(ordineCompleto);
+      setDialogVisualizzaOrdine(true);
+    } catch (error) {
+      console.error('Errore nel caricamento dettagli ordine:', error);
+      setSnackbar({
+        open: true,
+        message: 'Errore nel caricamento dettagli ordine',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleModificaOrdine = async (ordine: OrdineAcquisto) => {
+    try {
+      setLoading(true);
+      const ordineCompleto = await apiService.getOrdineAcquisto(ordine.id);
+      setOrdineSelezionato(ordineCompleto);
+      setDialogModificaOrdine(true);
+    } catch (error) {
+      console.error('Errore nel caricamento ordine per modifica:', error);
+      setSnackbar({
+        open: true,
+        message: 'Errore nel caricamento ordine per modifica',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEliminaOrdine = async (ordine: OrdineAcquisto) => {
+    if (!window.confirm(`Sei sicuro di voler eliminare l'ordine ${ordine.numero_ordine}?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await apiService.deleteOrdineAcquisto(ordine.id);
+      
+      setSnackbar({
+        open: true,
+        message: `Ordine ${ordine.numero_ordine} eliminato con successo`,
+        severity: 'success'
+      });
+      
+      // Ricarica la lista
+      await loadOrdiniAcquisto();
+    } catch (error) {
+      console.error('Errore nell\'eliminazione ordine:', error);
+      setSnackbar({
+        open: true,
+        message: 'Errore nell\'eliminazione ordine',
         severity: 'error'
       });
     } finally {
@@ -445,6 +517,7 @@ export default function GestioneAcquisti() {
                     <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                       <IconButton 
                         size="small" 
+                        onClick={() => handleVisualizzaOrdine(ordine)}
                         sx={{ 
                           color: modernColors.primary,
                           borderRadius: 1,
@@ -453,21 +526,43 @@ export default function GestioneAcquisti() {
                             transform: 'scale(1.1)'
                           }
                         }}
+                        title="Visualizza dettagli"
                       >
                         <ViewIcon />
                       </IconButton>
                       <IconButton 
                         size="small"
+                        onClick={() => handleModificaOrdine(ordine)}
+                        disabled={ordine.stato === 'Consegnato'}
                         sx={{ 
                           color: modernColors.secondary,
                           borderRadius: 1,
                           '&:hover': { 
                             backgroundColor: alpha(modernColors.secondary, 0.1),
                             transform: 'scale(1.1)'
-                          }
+                          },
+                          '&.Mui-disabled': { color: modernColors.textSecondary }
                         }}
+                        title="Modifica ordine"
                       >
                         <EditIcon />
+                      </IconButton>
+                      <IconButton 
+                        size="small"
+                        onClick={() => handleEliminaOrdine(ordine)}
+                        disabled={ordine.stato === 'Consegnato'}
+                        sx={{ 
+                          color: modernColors.error,
+                          borderRadius: 1,
+                          '&:hover': { 
+                            backgroundColor: alpha(modernColors.error, 0.1),
+                            transform: 'scale(1.1)'
+                          },
+                          '&.Mui-disabled': { color: modernColors.textSecondary }
+                        }}
+                        title="Elimina ordine"
+                      >
+                        <DeleteIcon />
                       </IconButton>
                       {ordine.stato === 'Ordinato' && (
                         <IconButton 
@@ -481,6 +576,7 @@ export default function GestioneAcquisti() {
                               transform: 'scale(1.1)'
                             }
                           }}
+                          title="Segna come consegnato"
                         >
                           <CheckCircleIcon />
                         </IconButton>
@@ -590,6 +686,163 @@ export default function GestioneAcquisti() {
         }}
         modalitaIniziale="ordini"
         soloOrdini={true}
+      />
+
+      {/* Dialog Visualizza Ordine - Semplice */}
+      <Dialog
+        open={dialogVisualizzaOrdine}
+        onClose={() => {
+          setDialogVisualizzaOrdine(false);
+          setOrdineSelezionato(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        {ordineSelezionato && (
+          <Box sx={{ p: 0 }}>
+            {/* Header */}
+            <Box sx={{
+              background: `linear-gradient(135deg, ${modernColors.primary} 0%, ${modernColors.secondary} 100%)`,
+              color: 'white',
+              p: 3,
+              borderRadius: 0
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <ShoppingCartIcon sx={{ fontSize: 32 }} />
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                    📋 Dettagli Ordine {ordineSelezionato.numero_ordine}
+                  </Typography>
+                  <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                    Visualizzazione completa dell'ordine
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Contenuto */}
+            <Box sx={{ p: 3 }}>
+              <Grid container spacing={3}>
+                {/* Informazioni base */}
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, borderRadius: 1, border: `1px solid ${alpha(modernColors.primary, 0.2)}` }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: modernColors.text, fontWeight: 600 }}>
+                      📋 Informazioni Ordine
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Fornitore:</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{ordineSelezionato.ragione_sociale}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Data Ordine:</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {new Date(ordineSelezionato.data_ordine).toLocaleDateString('it-IT')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Consegna Prevista:</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {new Date(ordineSelezionato.data_consegna_prevista).toLocaleDateString('it-IT')}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Stato:</Typography>
+                        <Chip
+                          icon={getStatoIcon(ordineSelezionato.stato)}
+                          label={ordineSelezionato.stato}
+                          size="small"
+                          sx={{
+                            backgroundColor: alpha(getStatoColor(ordineSelezionato.stato), 0.1),
+                            color: getStatoColor(ordineSelezionato.stato),
+                            fontWeight: 600
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                {/* Totali */}
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, borderRadius: 1, border: `1px solid ${alpha(modernColors.primary, 0.2)}` }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: modernColors.text, fontWeight: 600 }}>
+                      💰 Totali
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Totale Ordine:</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: modernColors.primary }}>
+                          €{ordineSelezionato.totale_ordine.toFixed(2)}
+                        </Typography>
+                      </Box>
+                      {ordineSelezionato.note && (
+                        <Box sx={{ mt: 2, p: 2, backgroundColor: alpha(modernColors.primary, 0.05), borderRadius: 1 }}>
+                          <Typography variant="body2" sx={{ color: modernColors.textSecondary, mb: 1 }}>
+                            📝 Note:
+                          </Typography>
+                          <Typography variant="body2">
+                            {ordineSelezionato.note}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                {/* Articoli */}
+                <Grid item xs={12}>
+                  <Paper sx={{ p: 2, borderRadius: 1, border: `1px solid ${alpha(modernColors.primary, 0.2)}` }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: modernColors.text, fontWeight: 600 }}>
+                      📦 Articoli Ordinati
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: modernColors.textSecondary, fontStyle: 'italic' }}>
+                      Per visualizzare i dettagli completi degli articoli, utilizza il pulsante "Modifica" ordine.
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Pulsante Chiudi */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => {
+                    setDialogVisualizzaOrdine(false);
+                    setOrdineSelezionato(null);
+                  }}
+                  sx={{
+                    borderRadius: 1,
+                    background: `linear-gradient(135deg, ${modernColors.primary} 0%, ${modernColors.secondary} 100%)`,
+                    color: 'white',
+                    px: 4,
+                    py: 1.5,
+                    fontWeight: 600,
+                    '&:hover': {
+                      background: `linear-gradient(135deg, ${modernColors.secondary} 0%, ${modernColors.primary} 100%)`,
+                    }
+                  }}
+                >
+                  ✅ Chiudi
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Dialog>
+
+      {/* Dialog Modifica Ordine */}
+      <InserimentoFattureMultiRiga 
+        open={dialogModificaOrdine}
+        onClose={() => {
+          setDialogModificaOrdine(false);
+          setOrdineSelezionato(null);
+          loadOrdiniAcquisto(); // Ricarica dopo modifica
+        }}
+        modalitaIniziale="ordini"
+        soloOrdini={true}
+        ordineEsistente={ordineSelezionato}
+        modalitaModificaOrdine={true}
       />
 
       {/* Snackbar */}
