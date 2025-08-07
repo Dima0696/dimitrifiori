@@ -408,7 +408,6 @@ export default function GestioneMagazzino() {
                 p: 3, 
                 background: modernColors.background,
                 backdropFilter: 'blur(10px)',
-                minHeight: '60vh',
                 position: 'relative',
                 '&::before': {
                   content: '""',

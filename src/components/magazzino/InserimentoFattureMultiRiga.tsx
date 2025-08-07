@@ -563,6 +563,57 @@ export default function InserimentoFattureMultiRiga({
     }
   }, [open]);
 
+  // NUOVO: Carica i dati dell'ordine esistente per modifica
+  useEffect(() => {
+    if (modalitaModificaOrdine && ordineEsistente && open) {
+      console.log('🔄 Caricamento dati ordine esistente:', ordineEsistente);
+      
+      // Carica i dati dell'ordine nel form
+      setOrdineData({
+        data_ordine: ordineEsistente.data_ordine || new Date().toISOString().split('T')[0],
+        data_consegna_prevista: ordineEsistente.data_consegna_prevista || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        id_fornitore: ordineEsistente.fornitore_id || ordineEsistente.id_fornitore || 0,
+        totale_ordine: ordineEsistente.totale_ordine || 0,
+        stato: ordineEsistente.stato || 'ordinato',
+        note: ordineEsistente.note || '',
+        righe: ordineEsistente.righe || [
+          {
+            id_gruppo: 0,
+            nome_prodotto: '',
+            id_colore: 0,
+            id_provenienza: 0,
+            id_foto: 0,
+            id_imballo: 0,
+            id_altezza: 0,
+            id_qualita: 0,
+            quantita: 0,
+            prezzo_acquisto_per_stelo: 0,
+            totale_riga: 0
+          }
+        ],
+        costo_trasporto: ordineEsistente.costo_trasporto || 0,
+        id_fornitore_trasporto: ordineEsistente.id_fornitore_trasporto || 0,
+        costo_commissioni: ordineEsistente.costo_commissioni || 0,
+        id_fornitore_commissioni: ordineEsistente.id_fornitore_commissioni || 0,
+        costo_imballaggi: ordineEsistente.costo_imballaggi || 0,
+        id_fornitore_imballaggi: ordineEsistente.id_fornitore_imballaggi || 0,
+        note_costi: ordineEsistente.note_costi || '',
+        prezzi_vendita: ordineEsistente.prezzi_vendita || [
+          {
+            percentuale_ricarico_1: 50,
+            percentuale_ricarico_2: 75,
+            percentuale_ricarico_3: 100,
+            prezzo_vendita_1: 0,
+            prezzo_vendita_2: 0,
+            prezzo_vendita_3: 0
+          }
+        ]
+      });
+      
+      console.log('✅ Dati ordine caricati nel form');
+    }
+  }, [modalitaModificaOrdine, ordineEsistente, open]);
+
   // NUOVO: Funzione per applicare i filtri e ordinamento
   const applicaFiltri = () => {
     // Raggruppa documenti prima di filtrare
@@ -1347,6 +1398,13 @@ export default function InserimentoFattureMultiRiga({
     setOrdineSelezionato(null);
     setActiveTab(0);
     
+    // NON resettare i dati se siamo in modalità modifica ordine
+    if (modalitaModificaOrdine && ordineEsistente) {
+      console.log('🔄 Modalità modifica ordine - non resetto i dati');
+      setOpenDialog(true);
+      return;
+    }
+    
     if (modalitaOrdini) {
       // Reset per nuovo ordine
       setOrdineData({
@@ -1728,15 +1786,107 @@ export default function InserimentoFattureMultiRiga({
       if (modalitaOrdini) {
         // ===== GESTIONE ORDINI ACQUISTO =====
         
-        if (modalitaModifica && ordineSelezionato) {
-          // TODO: Modalità modifica ordini - da implementare
+        if (modalitaModificaOrdine && ordineEsistente) {
+          // **MODIFICA ORDINE ACQUISTO ESISTENTE**
+          console.log('🔄 Modifica ordine acquisto esistente...');
+          
+          // 1. Aggiorna l'ordine acquisto base
+          const ordineAggiornato = await apiService.updateOrdineAcquisto(ordineEsistente.id, {
+            data_ordine: ordineData.data_ordine,
+            data_consegna_prevista: ordineData.data_consegna_prevista,
+            fornitore_id: ordineData.id_fornitore,
+            totale_ordine: ordineData.totale_ordine,
+            note: ordineData.note,
+            costo_trasporto: ordineData.costo_trasporto || 0,
+            id_fornitore_trasporto: ordineData.id_fornitore_trasporto || null,
+            costo_commissioni: ordineData.costo_commissioni || 0,
+            id_fornitore_commissioni: ordineData.id_fornitore_commissioni || null,
+            costo_imballaggi: ordineData.costo_imballaggi || 0,
+            id_fornitore_imballaggi: ordineData.id_fornitore_imballaggi || null,
+            note_costi: ordineData.note_costi
+          });
+          
+          console.log('✅ Ordine acquisto aggiornato:', ordineAggiornato);
+          
+          // 2. Elimina tutte le giacenze virtuali esistenti dell'ordine
+          const giacenzeEsistenti = await apiService.getGiacenzeVirtualiByOrdine(ordineEsistente.id);
+          for (const giacenza of giacenzeEsistenti) {
+            await apiService.deleteGiacenzaVirtuale(giacenza.id);
+          }
+          
+          console.log('🗑️ Giacenze virtuali esistenti eliminate');
+          
+          // 3. Crea le nuove giacenze virtuali per ogni riga
+          for (const riga of ordineData.righe) {
+            const prezzoVendita = ordineData.prezzi_vendita[0]; // Usa i prezzi del primo articolo
+            
+            await apiService.createGiacenzaVirtuale({
+              ordine_acquisto_id: ordineEsistente.id,
+              gruppo_id: riga.id_gruppo,
+              nome_prodotto: riga.nome_prodotto,
+              colore_id: riga.id_colore,
+              provenienza_id: riga.id_provenienza,
+              foto_id: riga.id_foto,
+              imballo_id: riga.id_imballo,
+              altezza_id: riga.id_altezza,
+              qualita_id: riga.id_qualita,
+              quantita: riga.quantita,
+              prezzo_acquisto_per_stelo: riga.prezzo_acquisto_per_stelo,
+              prezzo_vendita_1: prezzoVendita.prezzo_vendita_1,
+              prezzo_vendita_2: prezzoVendita.prezzo_vendita_2,
+              prezzo_vendita_3: prezzoVendita.prezzo_vendita_3,
+              note: riga.note || ordineData.note
+            });
+          }
+          
+          console.log('✅ Nuove giacenze virtuali create per ordine:', ordineAggiornato.numero_ordine);
+          
+          // 4. Elimina i movimenti virtuali esistenti dell'ordine
+          const movimentiEsistenti = await apiService.getMovimentiMagazzino({
+            tipo: 'carico_virtuale',
+            ordineId: ordineEsistente.id
+          });
+          
+          for (const movimento of movimentiEsistenti) {
+            if (movimento.ordine_acquisto_id === ordineEsistente.id) {
+              await apiService.eliminaMovimentoMagazzino(movimento.id);
+            }
+          }
+          
+          console.log('🗑️ Movimenti virtuali esistenti eliminati');
+          
+          // 5. Crea i nuovi movimenti di carico virtuale
+          for (const riga of ordineData.righe) {
+            await apiService.creaMovimentoMagazzino({
+              tipo: 'carico_virtuale',
+              data: ordineData.data_ordine,
+              quantita: riga.quantita,
+              prezzo_unitario: riga.prezzo_acquisto_per_stelo,
+              valore_totale: riga.quantita * riga.prezzo_acquisto_per_stelo,
+              gruppo_id: riga.id_gruppo,
+              colore_id: riga.id_colore,
+              provenienza_id: riga.id_provenienza,
+              foto_id: riga.id_foto,
+              imballo_id: riga.id_imballo,
+              altezza_id: riga.id_altezza,
+              qualita_id: riga.id_qualita,
+              fornitore_id: ordineData.id_fornitore,
+              ordine_acquisto_id: ordineEsistente.id,
+              note: `Ordine virtuale ${ordineAggiornato.numero_ordine} - ${riga.nome_prodotto}`
+            });
+          }
+          
+          console.log('✅ Nuovi movimenti virtuali creati');
+          
           setSnackbar({
             open: true,
-            message: 'Modifica ordini non ancora implementata',
-            severity: 'warning'
+            message: `🎉 Ordine acquisto ${ordineAggiornato.numero_ordine} aggiornato con successo!`,
+            severity: 'success'
           });
-          setLoading(false);
-          return;
+          
+          // Ricarica la lista ordini
+          await loadOrdiniAcquisto();
+          
         } else {
           // **CREAZIONE NUOVO ORDINE ACQUISTO**
           console.log('🆕 Creazione nuovo ordine acquisto...');
@@ -3051,9 +3201,9 @@ export default function InserimentoFattureMultiRiga({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
     >
-      <Paper sx={{ ...modernStyles.glassmorphic, mb: 3 }}>
-        <Box sx={{ p: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+      <Paper sx={{ ...modernStyles.glassmorphic, mb: 1 }}>
+        <Box sx={{ p: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <ReceiptIcon sx={{ fontSize: 40, color: '#667eea', mr: 2 }} />
             <Typography 
               variant="h5" 
@@ -3071,9 +3221,9 @@ export default function InserimentoFattureMultiRiga({
           </Box>
 
           {/* NUOVO: Sezione Filtri */}
-          <Card sx={{ mb: 2, borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.9)' }}>
-            <CardContent sx={{ p: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2, color: '#667eea', fontWeight: 600, fontSize: '1.1rem' }}>
+          <Card sx={{ mb: 1, borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.9)' }}>
+            <CardContent sx={{ p: 1 }}>
+              <Typography variant="h6" sx={{ mb: 1, color: '#667eea', fontWeight: 600, fontSize: '1.1rem' }}>
                 <FilterIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                 Filtri di Ricerca
               </Typography>
@@ -3349,7 +3499,7 @@ export default function InserimentoFattureMultiRiga({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
       style={{
-        minHeight: '100vh',
+        minHeight: open ? '100vh' : 'fit-content',
         background: modernStyles.colors.background,
       }}
     >
@@ -3415,7 +3565,7 @@ export default function InserimentoFattureMultiRiga({
             transition={{ duration: 0.4, delay: 0.2 }}
           >
             <Paper sx={modernStyles.glassmorphic}>
-              <Box sx={{ p: 2 }}>
+              <Box sx={{ p: 1.5 }}>
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -3506,7 +3656,7 @@ export default function InserimentoFattureMultiRiga({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
-                  style={{ marginTop: '16px' }}
+                  style={{ marginTop: '8px' }}
                 >
                   <Button
                     variant="contained"
@@ -3526,7 +3676,11 @@ export default function InserimentoFattureMultiRiga({
       )}
 
       {/* NUOVO: Lista fatture esistenti */}
-      {!soloOrdini && renderListaFatture()}
+      {!soloOrdini && (
+        <Box sx={{ mt: 1 }}>
+          {renderListaFatture()}
+        </Box>
+      )}
 
       <Dialog 
           open={open || openDialog} 

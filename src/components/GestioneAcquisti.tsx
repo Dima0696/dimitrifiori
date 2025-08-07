@@ -23,6 +23,7 @@ import {
   FormControl,
   InputLabel,
   Dialog,
+  Divider,
   alpha
 } from '@mui/material';
 import {
@@ -46,9 +47,9 @@ interface OrdineAcquisto {
   numero_ordine: string;
   data_ordine: string;
   data_consegna_prevista: string;
-  id_fornitore: number;
-  ragione_sociale: string;
-  stato: 'Ordinato' | 'Consegnato';
+  fornitore_id: number;
+  fornitore_nome: string;
+  stato: 'ordinato' | 'consegnato';
   totale_ordine: number;
   note?: string;
   created_at: string;
@@ -84,15 +85,15 @@ export default function GestioneAcquisti() {
   // Statistiche derivate
   const stats = {
     totaleOrdini: ordini.length,
-    ordiniOrdinati: ordini.filter(o => o.stato === 'Ordinato').length,
-    ordiniConsegnati: ordini.filter(o => o.stato === 'Consegnato').length,
-    valoreOrdinato: ordini.filter(o => o.stato === 'Ordinato').reduce((acc, o) => acc + o.totale_ordine, 0)
+    ordiniOrdinati: ordini.filter(o => o.stato === 'ordinato').length,
+    ordiniConsegnati: ordini.filter(o => o.stato === 'consegnato').length,
+    valoreOrdinato: ordini.filter(o => o.stato === 'ordinato').reduce((acc, o) => acc + o.totale_ordine, 0)
   };
 
   // Ordini filtrati
   const ordiniFiltrati = ordini.filter(ordine => {
     const matchStato = !filtroStato || ordine.stato === filtroStato;
-    const matchFornitore = !filtroFornitore || ordine.ragione_sociale.toLowerCase().includes(filtroFornitore.toLowerCase());
+    const matchFornitore = !filtroFornitore || ordine.fornitore_nome.toLowerCase().includes(filtroFornitore.toLowerCase());
     return matchStato && matchFornitore;
   });
 
@@ -118,7 +119,33 @@ export default function GestioneAcquisti() {
   const handleVisualizzaOrdine = async (ordine: OrdineAcquisto) => {
     try {
       setLoading(true);
-      const ordineCompleto = await apiService.getOrdineAcquisto(ordine.id);
+      
+      // Carica l'ordine base
+      const ordineBase = await apiService.getOrdineAcquisto(ordine.id);
+      
+      // Carica le giacenze virtuali (righe) dell'ordine
+      const giacenzeVirtuali = await apiService.getGiacenzeVirtualiByOrdine(ordine.id);
+      
+             // Costruisce l'ordine completo con le righe per la visualizzazione
+       const ordineCompleto = {
+         ...ordineBase,
+         // Aggiungi il nome del fornitore per la visualizzazione
+         fornitore_nome: ordineBase.fornitore?.ragione_sociale || ordineBase.fornitore?.nome || 'Fornitore non trovato',
+        righe: giacenzeVirtuali.map(gv => ({
+          id_gruppo: gv.gruppo_id,
+          nome_prodotto: gv.nome_prodotto,
+          id_colore: gv.colore_id,
+          id_provenienza: gv.provenienza_id,
+          id_foto: gv.foto_id,
+          id_imballo: gv.imballo_id,
+          id_altezza: gv.altezza_id,
+          id_qualita: gv.qualita_id,
+          quantita: gv.quantita,
+          prezzo_acquisto_per_stelo: gv.prezzo_acquisto_per_stelo,
+          totale_riga: gv.totale_riga
+        }))
+      };
+      
       setOrdineSelezionato(ordineCompleto);
       setDialogVisualizzaOrdine(true);
     } catch (error) {
@@ -133,12 +160,68 @@ export default function GestioneAcquisti() {
     }
   };
 
-  const handleModificaOrdine = async (ordine: OrdineAcquisto) => {
+    const handleModificaOrdine = async (ordine: OrdineAcquisto) => {
     try {
       setLoading(true);
-      const ordineCompleto = await apiService.getOrdineAcquisto(ordine.id);
+      
+      console.log('🔄 Inizio caricamento ordine per modifica:', ordine.id);
+      
+      // Carica l'ordine base
+      const ordineBase = await apiService.getOrdineAcquisto(ordine.id);
+      console.log('📋 Ordine base caricato:', ordineBase);
+      
+      // Carica le giacenze virtuali (righe) dell'ordine
+      const giacenzeVirtuali = await apiService.getGiacenzeVirtualiByOrdine(ordine.id);
+      console.log('📦 Giacenze virtuali caricate:', giacenzeVirtuali);
+      
+      // Costruisce l'ordine completo con le righe
+      const ordineCompleto = {
+        ...ordineBase,
+        // Aggiungi il nome del fornitore per la visualizzazione
+        fornitore_nome: ordineBase.fornitore?.ragione_sociale || ordineBase.fornitore?.nome || 'Fornitore non trovato',
+        righe: giacenzeVirtuali.map(gv => ({
+          id_gruppo: gv.gruppo_id,
+          nome_prodotto: gv.nome_prodotto,
+          id_colore: gv.colore_id,
+          id_provenienza: gv.provenienza_id,
+          id_foto: gv.foto_id,
+          id_imballo: gv.imballo_id,
+          id_altezza: gv.altezza_id,
+          id_qualita: gv.qualita_id,
+          quantita: gv.quantita,
+          prezzo_acquisto_per_stelo: gv.prezzo_acquisto_per_stelo,
+          totale_riga: gv.totale_riga
+        })),
+        // Costi analitici dall'ordine base
+        costo_trasporto: ordineBase.costo_trasporto || 0,
+        id_fornitore_trasporto: ordineBase.id_fornitore_trasporto || 0,
+        costo_commissioni: ordineBase.costo_commissioni || 0,
+        id_fornitore_commissioni: ordineBase.id_fornitore_commissioni || 0,
+        costo_imballaggi: ordineBase.costo_imballaggi || 0,
+        id_fornitore_imballaggi: ordineBase.id_fornitore_imballaggi || 0,
+        note_costi: ordineBase.note_costi || '',
+        // Prezzi di vendita (se disponibili nelle giacenze virtuali)
+        prezzi_vendita: giacenzeVirtuali.length > 0 ? [{
+          percentuale_ricarico_1: 50, // Default - potremmo calcolarlo
+          percentuale_ricarico_2: 75,
+          percentuale_ricarico_3: 100,
+          prezzo_vendita_1: giacenzeVirtuali[0].prezzo_vendita_1 || 0,
+          prezzo_vendita_2: giacenzeVirtuali[0].prezzo_vendita_2 || 0,
+          prezzo_vendita_3: giacenzeVirtuali[0].prezzo_vendita_3 || 0
+        }] : [{
+          percentuale_ricarico_1: 50,
+          percentuale_ricarico_2: 75,
+          percentuale_ricarico_3: 100,
+          prezzo_vendita_1: 0,
+          prezzo_vendita_2: 0,
+          prezzo_vendita_3: 0
+        }]
+      };
+      
+      console.log('🔄 Ordine completo caricato:', ordineCompleto);
       setOrdineSelezionato(ordineCompleto);
       setDialogModificaOrdine(true);
+      console.log('✅ Dialog modifica ordine aperto con successo');
     } catch (error) {
       console.error('Errore nel caricamento ordine per modifica:', error);
       setSnackbar({
@@ -208,16 +291,16 @@ export default function GestioneAcquisti() {
 
   const getStatoColor = (stato: string) => {
     switch (stato) {
-      case 'Ordinato': return modernColors.warning;
-      case 'Consegnato': return modernColors.success;
+      case 'ordinato': return modernColors.warning;
+      case 'consegnato': return modernColors.success;
       default: return modernColors.textSecondary;
     }
   };
 
   const getStatoIcon = (stato: string) => {
     switch (stato) {
-      case 'Ordinato': return <ShoppingCartIcon />;
-      case 'Consegnato': return <CheckCircleIcon />;
+      case 'ordinato': return <ShoppingCartIcon />;
+      case 'consegnato': return <CheckCircleIcon />;
       default: return <ShoppingCartIcon />;
     }
   };
@@ -374,8 +457,8 @@ export default function GestioneAcquisti() {
                 }}
               >
                 <MenuItem value="">🗂️ Tutti gli stati</MenuItem>
-                <MenuItem value="Ordinato">🛒 Ordinato</MenuItem>
-                <MenuItem value="Consegnato">✅ Consegnato</MenuItem>
+                                 <MenuItem value="ordinato">🛒 Ordinato</MenuItem>
+                 <MenuItem value="consegnato">✅ Consegnato</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -481,11 +564,11 @@ export default function GestioneAcquisti() {
                       {ordine.numero_ordine}
                     </Typography>
                   </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {ordine.ragione_sociale}
-                    </Typography>
-                  </TableCell>
+                                     <TableCell>
+                     <Typography variant="body2">
+                       {ordine.fornitore_nome}
+                     </Typography>
+                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
                       {new Date(ordine.data_ordine).toLocaleDateString('it-IT')}
@@ -530,10 +613,10 @@ export default function GestioneAcquisti() {
                       >
                         <ViewIcon />
                       </IconButton>
-                      <IconButton 
-                        size="small"
-                        onClick={() => handleModificaOrdine(ordine)}
-                        disabled={ordine.stato === 'Consegnato'}
+                                             <IconButton 
+                         size="small"
+                         onClick={() => handleModificaOrdine(ordine)}
+                         disabled={ordine.stato === 'consegnato'}
                         sx={{ 
                           color: modernColors.secondary,
                           borderRadius: 1,
@@ -547,10 +630,10 @@ export default function GestioneAcquisti() {
                       >
                         <EditIcon />
                       </IconButton>
-                      <IconButton 
-                        size="small"
-                        onClick={() => handleEliminaOrdine(ordine)}
-                        disabled={ordine.stato === 'Consegnato'}
+                                             <IconButton 
+                         size="small"
+                         onClick={() => handleEliminaOrdine(ordine)}
+                         disabled={ordine.stato === 'consegnato'}
                         sx={{ 
                           color: modernColors.error,
                           borderRadius: 1,
@@ -564,7 +647,7 @@ export default function GestioneAcquisti() {
                       >
                         <DeleteIcon />
                       </IconButton>
-                      {ordine.stato === 'Ordinato' && (
+                                             {ordine.stato === 'ordinato' && (
                         <IconButton 
                           size="small" 
                           onClick={() => handleConsegnaOrdine(ordine.id)}
@@ -732,7 +815,7 @@ export default function GestioneAcquisti() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Fornitore:</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{ordineSelezionato.ragione_sociale}</Typography>
+                                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{ordineSelezionato.fornitore_nome}</Typography>
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Data Ordine:</Typography>
@@ -794,11 +877,82 @@ export default function GestioneAcquisti() {
                 <Grid item xs={12}>
                   <Paper sx={{ p: 2, borderRadius: 1, border: `1px solid ${alpha(modernColors.primary, 0.2)}` }}>
                     <Typography variant="h6" sx={{ mb: 2, color: modernColors.text, fontWeight: 600 }}>
-                      📦 Articoli Ordinati
+                      📦 Articoli Ordinati ({ordineSelezionato.righe?.length || 0})
                     </Typography>
-                    <Typography variant="body2" sx={{ color: modernColors.textSecondary, fontStyle: 'italic' }}>
-                      Per visualizzare i dettagli completi degli articoli, utilizza il pulsante "Modifica" ordine.
+                    {ordineSelezionato.righe && ordineSelezionato.righe.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {ordineSelezionato.righe.map((riga, index) => (
+                          <Box 
+                            key={index}
+                            sx={{ 
+                              p: 2, 
+                              backgroundColor: alpha(modernColors.primary, 0.05), 
+                              borderRadius: 1,
+                              border: `1px solid ${alpha(modernColors.primary, 0.1)}`
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                              <Typography variant="body1" sx={{ fontWeight: 600, color: modernColors.text }}>
+                                {riga.nome_prodotto}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: modernColors.primary, fontWeight: 600 }}>
+                                €{riga.totale_riga.toFixed(2)}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                              <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>
+                                Qty: {riga.quantita} steli
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>
+                                Prezzo: €{riga.prezzo_acquisto_per_stelo.toFixed(2)}/stelo
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: modernColors.textSecondary, fontStyle: 'italic' }}>
+                        Nessun articolo trovato per questo ordine.
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+
+                {/* Costi Analitici */}
+                <Grid item xs={12}>
+                  <Paper sx={{ p: 2, borderRadius: 1, border: `1px solid ${alpha(modernColors.primary, 0.2)}` }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: modernColors.text, fontWeight: 600 }}>
+                      💰 Costi Analitici
                     </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Trasporto:</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          €{ordineSelezionato.costo_trasporto?.toFixed(2) || '0.00'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Commissioni:</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          €{ordineSelezionato.costo_commissioni?.toFixed(2) || '0.00'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" sx={{ color: modernColors.textSecondary }}>Imballaggi:</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          €{ordineSelezionato.costo_imballaggi?.toFixed(2) || '0.00'}
+                        </Typography>
+                      </Box>
+                      <Divider sx={{ my: 1 }} />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: modernColors.primary }}>
+                          Totale Costi:
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 700, color: modernColors.primary }}>
+                          €{((ordineSelezionato.costo_trasporto || 0) + (ordineSelezionato.costo_commissioni || 0) + (ordineSelezionato.costo_imballaggi || 0)).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Paper>
                 </Grid>
               </Grid>

@@ -210,6 +210,14 @@ export interface OrdineAcquisto {
   updated_at: string;
   data_consegna_effettiva?: string;
   fattura_generata_id?: number;
+  
+  // Dati fornitore (join)
+  fornitore?: {
+    id: number;
+    nome: string;
+    ragione_sociale?: string;
+    partita_iva?: string;
+  };
 }
 
 export interface GiacenzaVirtuale {
@@ -2395,6 +2403,7 @@ class ApiService {
     gruppoId?: number;
     prodottoId?: number;
     coloreId?: number;
+    ordineId?: number;
   }): Promise<MovimentoMagazzino[]> {
     try {
       let query = supabase
@@ -2426,6 +2435,9 @@ class ApiService {
       }
       if (filtri?.coloreId) {
         query = query.eq('colore_id', filtri.coloreId);
+      }
+      if (filtri?.ordineId) {
+        query = query.eq('ordine_acquisto_id', filtri.ordineId);
       }
 
       const { data, error } = await query;
@@ -2892,12 +2904,20 @@ class ApiService {
   }
 
   /**
-   * Ottiene un singolo ordine acquisto per ID
+   * Ottiene un singolo ordine acquisto per ID con dati fornitore
    */
   async getOrdineAcquisto(id: number): Promise<OrdineAcquisto> {
     const { data, error } = await supabase
       .from('ordini_acquisto')
-      .select('*')
+      .select(`
+        *,
+        fornitore:fornitori!ordini_acquisto_fornitore_id_fkey(
+          id,
+          nome,
+          ragione_sociale,
+          partita_iva
+        )
+      `)
       .eq('id', id)
       .single();
     
