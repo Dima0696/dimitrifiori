@@ -17,6 +17,11 @@ import GestioneAcquisti from './components/GestioneAcquisti';
 import TestApiService from './components/TestApiService';
 import Anagrafica from './components/Anagrafica';
 import modernTheme from './styles/modernTheme';
+import GestioneVendite from './components/GestioneVendite';
+import OrdineWizard from './components/vendite/OrdineWizard';
+import DDTWizard from './components/vendite/DDTWizard';
+import FatturaWizard from './components/vendite/FatturaWizard';
+import ResoWizard from './components/vendite/ResoWizard';
 
 
 
@@ -54,6 +59,13 @@ function App() {
                 {/* Gestione Acquisti */}
                 <Route path="/acquisti" element={<ProtectedRoute><MainLayout title="Gestione Acquisti"><GestioneAcquisti /></MainLayout></ProtectedRoute>} />
                 
+                {/* Gestione Vendite */}
+                <Route path="/vendite" element={<ProtectedRoute><MainLayout title="Gestione Vendite"><GestioneVendite /></MainLayout></ProtectedRoute>} />
+                <Route path="/vendite/nuovo-ordine" element={<ProtectedRoute><MainLayout title="Nuovo Ordine"><OrdineWizard /></MainLayout></ProtectedRoute>} />
+                <Route path="/vendite/nuovo-ddt" element={<ProtectedRoute><MainLayout title="Nuovo DDT"><DDTWizard /></MainLayout></ProtectedRoute>} />
+                <Route path="/vendite/nuova-fattura" element={<ProtectedRoute><MainLayout title="Nuova Fattura"><FatturaWizard /></MainLayout></ProtectedRoute>} />
+                <Route path="/vendite/nuovo-reso" element={<ProtectedRoute><MainLayout title="Nuovo Reso / Nota di credito"><ResoWizard /></MainLayout></ProtectedRoute>} />
+
                 {/* Test API */}
                 <Route path="/test-api" element={<ProtectedRoute><MainLayout title="Test API Service"><TestApiService /></MainLayout></ProtectedRoute>} />
                 

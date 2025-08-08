@@ -7,8 +7,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configurazione Supabase - priorità alle variabili di ambiente per il deploy online
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
+const supabaseKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0';
 
 console.log('🔗 Connessione Supabase:', supabaseUrl.includes('127.0.0.1') ? 'LOCALE' : 'ONLINE');
 
@@ -335,6 +335,110 @@ export interface GiacenzaVirtualeCompleta {
 // API SERVICE CLASS
 // =========================================================================
 
+// =========================================================================
+// INTERFACCE VENDITE (ordini, ddt, fatture, note di credito, incassi)
+// =========================================================================
+
+export interface OrdineVendita {
+  id: number;
+  numero_ordine?: string;
+  data_ordine: string;
+  data_consegna_prevista?: string | null;
+  cliente_id: number;
+  cliente_nome?: string;
+  stato: 'bozza' | 'confermato' | 'parz_evaso' | 'evaso' | 'fatturato' | 'annullato';
+  sconto_percentuale?: number;
+  note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OrdineVenditaRiga {
+  id: number;
+  ordine_id: number;
+  articolo_id?: number | null;
+  gruppo_id?: number | null;
+  prodotto_id?: number | null;
+  colore_id?: number | null;
+  provenienza_id?: number | null;
+  foto_id?: number | null;
+  imballo_id?: number | null;
+  altezza_id?: number | null;
+  qualita_id?: number | null;
+  quantita: number;
+  prezzo_unitario: number;
+  sconto_percentuale?: number;
+  prezzo_finale?: number;
+  note?: string | null;
+}
+
+export interface DdtVendita {
+  id: number;
+  numero_ddt?: string;
+  data_ddt: string;
+  cliente_id: number;
+  cliente_nome?: string;
+  ordine_id?: number | null;
+  numero_ordine?: string | null;
+  stato: 'da_fatturare' | 'fatturato' | 'annullato';
+  destinazione?: string | null;
+  spedizioniere?: string | null;
+  note?: string | null;
+}
+
+export interface DdtVenditaRiga {
+  id: number;
+  ddt_id: number;
+  ordine_riga_id?: number | null;
+  articolo_id?: number | null;
+  gruppo_id?: number | null;
+  prodotto_id?: number | null;
+  colore_id?: number | null;
+  provenienza_id?: number | null;
+  foto_id?: number | null;
+  imballo_id?: number | null;
+  altezza_id?: number | null;
+  qualita_id?: number | null;
+  quantita: number;
+  prezzo_unitario: number;
+  prezzo_finale: number;
+  note?: string | null;
+}
+
+export interface FatturaVendita {
+  id: number;
+  numero_fattura?: string;
+  data_fattura: string;
+  cliente_id: number;
+  cliente_nome?: string;
+  stato: 'non_pagata' | 'parzialmente_pagata' | 'pagata' | 'annullata';
+  imponibile: number;
+  iva: number;
+  totale: number;
+  note?: string | null;
+}
+
+export interface NotaCreditoVendita {
+  id: number;
+  numero_nota?: string;
+  data_nota: string;
+  cliente_id: number;
+  cliente_nome?: string;
+  fattura_origine_id?: number | null;
+  stato: 'aperta' | 'compensata' | 'annullata';
+  totale: number;
+  note?: string | null;
+}
+
+export interface PagamentoVendita {
+  id: number;
+  fattura_id: number;
+  data_pagamento: string;
+  importo: number;
+  metodo: 'contanti' | 'bonifico' | 'pos' | 'altro';
+  note?: string | null;
+}
+
 class ApiService {
   
   // === GRUPPI ===
@@ -346,6 +450,285 @@ class ApiService {
     
     if (error) throw error;
     return data || [];
+  }
+
+  // =========================================================================
+  // === VENDITE: Ordini, DDT, Fatture, Note di credito, Incassi ===
+  // =========================================================================
+
+  // --- Ordini vendita ---
+  async getOrdiniVendita(): Promise<OrdineVendita[]> {
+    const { data, error } = await supabase
+      .from('view_ordini_vendita_completi')
+      .select('*')
+      .order('data_ordine', { ascending: false });
+    if (error) throw error;
+    return (data as OrdineVendita[]) || [];
+  }
+
+  async getOrdineVendita(id: number): Promise<{ ordine: OrdineVendita; righe: OrdineVenditaRiga[] }> {
+    const { data: ordine, error: e1 } = await supabase
+      .from('ordini_vendita')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (e1) throw e1;
+
+    const { data: righe, error: e2 } = await supabase
+      .from('ordini_vendita_righe')
+      .select('*')
+      .eq('ordine_id', id)
+      .order('id');
+    if (e2) throw e2;
+
+    return { ordine: ordine as OrdineVendita, righe: (righe as OrdineVenditaRiga[]) || [] };
+  }
+
+  async createOrdineVendita(
+    ordine: Omit<OrdineVendita, 'id' | 'numero_ordine' | 'created_at' | 'updated_at'>,
+    righe: Array<Omit<OrdineVenditaRiga, 'id' | 'ordine_id' | 'prezzo_finale'>>
+  ): Promise<number> {
+    const { data: o, error: eo } = await supabase
+      .from('ordini_vendita')
+      .insert([{ ...ordine }])
+      .select('id')
+      .single();
+    if (eo) throw eo;
+    const ordineId = (o as any).id as number;
+
+    if (righe && righe.length > 0) {
+      const payload = righe.map(r => ({ ...r, ordine_id: ordineId }));
+      const { error: er } = await supabase.from('ordini_vendita_righe').insert(payload);
+      if (er) throw er;
+    }
+    return ordineId;
+  }
+
+  async updateOrdineVendita(
+    id: number,
+    ordine: Partial<Omit<OrdineVendita, 'id' | 'numero_ordine' | 'created_at' | 'updated_at'>>
+  ): Promise<void> {
+    const { error } = await supabase.from('ordini_vendita').update(ordine).eq('id', id);
+    if (error) throw error;
+  }
+
+  async deleteOrdineVendita(id: number): Promise<void> {
+    const { error } = await supabase.from('ordini_vendita').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // --- DDT ---
+  async getDDTVendita(): Promise<DdtVendita[]> {
+    const { data, error } = await supabase
+      .from('view_ddt_vendita_completi')
+      .select('*')
+      .order('data_ddt', { ascending: false });
+    if (error) throw error;
+    return (data as DdtVendita[]) || [];
+  }
+
+  async getDDTVenditaById(id: number): Promise<{ ddt: DdtVendita; righe: DdtVenditaRiga[] }> {
+    const { data: ddt, error: e1 } = await supabase
+      .from('ddt_vendita')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (e1) throw e1;
+
+    const { data: righe, error: e2 } = await supabase
+      .from('ddt_vendita_righe')
+      .select('*')
+      .eq('ddt_id', id)
+      .order('id');
+    if (e2) throw e2;
+
+    return { ddt: ddt as any, righe: (righe as any) || [] };
+  }
+
+  async updateDDTVendita(id: number, ddt: Partial<Omit<DdtVendita, 'id' | 'numero_ddt'>>): Promise<void> {
+    const { error } = await supabase.from('ddt_vendita').update(ddt).eq('id', id);
+    if (error) throw error;
+  }
+
+  async replaceDDTRighe(id: number, righe: Array<Omit<DdtVenditaRiga, 'id' | 'ddt_id'>>): Promise<void> {
+    const { error: e1 } = await supabase.from('ddt_vendita_righe').delete().eq('ddt_id', id);
+    if (e1) throw e1;
+    if (righe?.length) {
+      const { error: e2 } = await supabase.from('ddt_vendita_righe').insert(righe.map(r => ({ ...r, ddt_id: id })));
+      if (e2) throw e2;
+    }
+  }
+
+  async addDDTRighe(id: number, righe: Array<Omit<DdtVenditaRiga, 'id' | 'ddt_id'>>): Promise<void> {
+    if (!righe?.length) return;
+    const { error } = await supabase.from('ddt_vendita_righe').insert(righe.map(r => ({ ...r, ddt_id: id })));
+    if (error) throw error;
+  }
+
+  async createDDTVendita(
+    ddt: Omit<DdtVendita, 'id' | 'numero_ddt'>,
+    righe: Array<Omit<DdtVenditaRiga, 'id' | 'ddt_id'>>
+  ): Promise<number> {
+    const { data: d, error: ed } = await supabase
+      .from('ddt_vendita')
+      .insert([{ ...ddt }])
+      .select('id')
+      .single();
+    if (ed) throw ed;
+    const ddtId = (d as any).id as number;
+    if (righe && righe.length > 0) {
+      const { error: er } = await supabase
+        .from('ddt_vendita_righe')
+        .insert(righe.map(r => ({ ...r, ddt_id: ddtId })));
+      if (er) throw er;
+    }
+    return ddtId;
+  }
+
+  async annullaDDTVendita(id: number): Promise<void> {
+    const { error } = await supabase
+      .from('ddt_vendita')
+      .update({ stato: 'annullato' })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
+  // --- Fatture ---
+  async getFattureVendita(): Promise<FatturaVendita[]> {
+    const { data, error } = await supabase
+      .from('view_fatture_vendita_completi')
+      .select('*')
+      .order('data_fattura', { ascending: false });
+    if (error) throw error;
+    return (data as FatturaVendita[]) || [];
+  }
+
+  async createFatturaVendita(
+    fattura: Omit<FatturaVendita, 'id' | 'numero_fattura'>,
+    righe: Array<{
+      articolo_id?: number | null;
+      gruppo_id?: number | null;
+      prodotto_id?: number | null;
+      colore_id?: number | null;
+      provenienza_id?: number | null;
+      foto_id?: number | null;
+      imballo_id?: number | null;
+      altezza_id?: number | null;
+      qualita_id?: number | null;
+      quantita: number;
+      prezzo_unitario: number;
+      sconto_percentuale?: number;
+      prezzo_finale: number;
+      iva_percentuale?: number;
+    }>
+  ): Promise<number> {
+    const { data: f, error: ef } = await supabase
+      .from('fatture_vendita')
+      .insert([{ ...fattura }])
+      .select('id')
+      .single();
+    if (ef) throw ef;
+    const fatturaId = (f as any).id as number;
+
+    if (righe?.length) {
+      const payload = righe.map(r => ({ ...r, fattura_id: fatturaId, sconto_percentuale: r.sconto_percentuale ?? 0, iva_percentuale: r.iva_percentuale ?? 0 }));
+      const { error: er } = await supabase.from('fatture_vendita_righe').insert(payload);
+      if (er) throw er;
+    }
+
+    return fatturaId;
+  }
+
+  async generaFatturaVenditaDaDDT(ddtId: number): Promise<{ fattura_id: number; numero_fattura: string }> {
+    const { data, error } = await supabase.rpc('genera_fattura_vendita_da_ddt', { p_ddt_id: ddtId });
+    if (error) throw error;
+    const row = (data && (data as any[])[0]) || null;
+    return { fattura_id: row?.fattura_id, numero_fattura: row?.numero_fattura };
+  }
+
+  async creaDDTDaOrdine(ordineId: number, righeQuantita: Array<{ ordine_riga_id: number; quantita: number }>): Promise<{ ddt_id: number; numero_ddt: string }> {
+    const { data, error } = await supabase.rpc('crea_ddt_da_ordine', {
+      p_ordine_id: ordineId,
+      p_righe_quantita: righeQuantita as any
+    });
+    if (error) throw error;
+    const row = (data && (data as any[])[0]) || null;
+    return { ddt_id: row?.ddt_id, numero_ddt: row?.numero_ddt };
+  }
+
+  async creaReso(
+    origine: { tipo: 'fattura' | 'ddt'; id: number },
+    clienteId: number,
+    righe: Array<{ fattura_riga_id?: number; articolo_ref: any; quantita: number; esito: 'reintegro'|'distruzione'; prezzo_unitario: number }>
+  ): Promise<{ nota_credito_id: number | null }> {
+    const { data, error } = await supabase.rpc('crea_reso', {
+      p_origine_tipo: origine.tipo,
+      p_origine_id: origine.id,
+      p_cliente_id: clienteId,
+      p_righe: righe as any
+    });
+    if (error) throw error;
+    const row = (data && (data as any[])[0]) || null;
+    return { nota_credito_id: row?.nota_credito_id ?? null };
+  }
+
+  async generaFattureDifferite(anno: number, mese: number, clienteId?: number): Promise<Array<{ fattura_id: number; cliente_id: number; numero_fattura: string }>> {
+    const { data, error } = await supabase.rpc('genera_fatture_differite', {
+      p_anno: anno,
+      p_mese: mese,
+      p_cliente_id: clienteId ?? null
+    });
+    if (error) throw error;
+    return (data as any[]) || [];
+  }
+
+  async eliminaFatturaVendita(fatturaId: number): Promise<void> {
+    const { error } = await supabase.rpc('elimina_fattura_vendita_completa', { p_fattura_id: fatturaId });
+    if (error) throw error;
+  }
+
+  // --- Note di credito ---
+  async getNoteCreditoVendita(): Promise<NotaCreditoVendita[]> {
+    const { data, error } = await supabase
+      .from('note_credito_vendita')
+      .select('*')
+      .order('data_nota', { ascending: false });
+    if (error) throw error;
+    return (data as NotaCreditoVendita[]) || [];
+  }
+
+  async createNotaCreditoVendita(
+    nota: Omit<NotaCreditoVendita, 'id' | 'numero_nota'>,
+    righe: Array<{ fattura_riga_id?: number | null; articolo_id?: number | null; quantita: number; prezzo_unitario: number; iva_percentuale?: number }>
+  ): Promise<number> {
+    const { data: n, error: en } = await supabase
+      .from('note_credito_vendita')
+      .insert([{ ...nota }])
+      .select('id')
+      .single();
+    if (en) throw en;
+    const notaId = (n as any).id as number;
+    if (righe?.length) {
+      const payload = righe.map(r => ({ ...r, nota_id: notaId, iva_percentuale: r.iva_percentuale ?? 0 }));
+      const { error: er } = await supabase.from('note_credito_vendita_righe').insert(payload);
+      if (er) throw er;
+    }
+    return notaId;
+  }
+
+  // --- Incassi / Scadenziario ---
+  async registraIncassoVendita(pagamento: Omit<PagamentoVendita, 'id'>): Promise<void> {
+    const { error } = await supabase.from('pagamenti_vendita').insert([pagamento]);
+    if (error) throw error;
+  }
+
+  async getScadenziarioClienti(): Promise<Array<{ fattura_id: number; numero_fattura: string; cliente_nome: string; totale: number; incassato: number; residuo: number; data_fattura: string }>> {
+    const { data, error } = await supabase
+      .from('view_scadenziario_clienti')
+      .select('*')
+      .order('data_fattura', { ascending: false });
+    if (error) throw error;
+    return (data as any[]) || [];
   }
 
   async createGruppo(gruppo: Omit<Gruppo, 'id' | 'created_at' | 'updated_at'>): Promise<Gruppo> {
@@ -1540,7 +1923,7 @@ class ApiService {
       if (result?.fattura_id && dati.costi_globali) {
         console.log('💰 Salvataggio costi analitici per fattura:', result.fattura_id);
         
-        const costiDaSalvare = [];
+        const costiDaSalvare: Array<{ tipo_costo: 'trasporto' | 'commissioni' | 'imballaggi'; importo: number; fornitore_id: number; note?: string; }> = [];
         
         // Aggiungi costo trasporto se presente
         if (dati.costi_globali.trasporto.importo > 0 && dati.costi_globali.trasporto.fornitore_id > 0) {
@@ -1548,7 +1931,7 @@ class ApiService {
             tipo_costo: 'trasporto' as const,
             importo: dati.costi_globali.trasporto.importo,
             fornitore_id: dati.costi_globali.trasporto.fornitore_id,
-            note: dati.costi_globali.note || 'Costo trasporto'
+            note: (dati.costi_globali.note || 'Costo trasporto') as string
           });
         }
         
@@ -1558,7 +1941,7 @@ class ApiService {
             tipo_costo: 'commissioni' as const,
             importo: dati.costi_globali.commissioni.importo,
             fornitore_id: dati.costi_globali.commissioni.fornitore_id,
-            note: dati.costi_globali.note || 'Commissioni'
+            note: (dati.costi_globali.note || 'Commissioni') as string
           });
         }
         
@@ -1568,7 +1951,7 @@ class ApiService {
             tipo_costo: 'imballaggi' as const,
             importo: dati.costi_globali.imballaggi.importo,
             fornitore_id: dati.costi_globali.imballaggi.fornitore_id,
-            note: dati.costi_globali.note || 'Costi imballaggi'
+            note: (dati.costi_globali.note || 'Costi imballaggi') as string
           });
         }
         
