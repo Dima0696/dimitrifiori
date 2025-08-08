@@ -1047,14 +1047,38 @@ class ApiService {
   }
 
   async createFatturaAcquisto(fattura: any): Promise<any> {
+    // Accetta sia le chiavi usate internamente che quelle usate altrove
+    let numero_fattura = fattura.numero_fattura ?? fattura.numero;
+    const id_fornitore = fattura.id_fornitore ?? fattura.fornitore_id;
+    const data_fattura = fattura.data;
+    const totale = fattura.totale;
+    const stato = fattura.stato || 'bozza';
+    const note = fattura.note;
+
+    // Se non viene passato un numero, lo genera il DB con sequenza annuale
+    if (!numero_fattura) {
+      try {
+        const { data: gen, error: genErr } = await supabase.rpc('genera_numero_fattura');
+        if (genErr) {
+          console.warn('⚠️ Impossibile generare numero fattura dal DB, uso fallback timestamp.', genErr);
+          numero_fattura = `FAT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+        } else {
+          numero_fattura = gen as string;
+        }
+      } catch (e) {
+        console.warn('⚠️ Errore RPC genera_numero_fattura, uso fallback.', e);
+        numero_fattura = `FAT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      }
+    }
+
     // Usa la procedura semplice (solo fattura)
     const { data, error } = await supabase.rpc('inserisci_fattura_semplice', {
-      p_numero_fattura: fattura.numero_fattura,
-      p_data_fattura: fattura.data,
-      p_id_fornitore: fattura.id_fornitore,
-      p_totale: fattura.totale,
-      p_stato: fattura.stato || 'bozza',
-      p_note: fattura.note
+      p_numero_fattura: numero_fattura,
+      p_data_fattura: data_fattura,
+      p_id_fornitore: id_fornitore,
+      p_totale: totale,
+      p_stato: stato,
+      p_note: note
     });
     
     if (error) throw error;
@@ -1122,6 +1146,41 @@ class ApiService {
       .select()
       .single();
     
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Crea un documento di carico legato ad una fattura
+   */
+  async createDocumentoCarico(dati: {
+    fattura_acquisto_id: number;
+    articolo_id: number;
+    quantita: number;
+    prezzo_acquisto_per_stelo: number;
+    costi_spalmare_per_stelo?: number;
+    prezzo_vendita_1?: number;
+    prezzo_vendita_2?: number;
+    prezzo_vendita_3?: number;
+    note?: string;
+  }): Promise<any> {
+    const { data, error } = await supabase
+      .from('documenti_carico')
+      .insert([{
+        fattura_acquisto_id: dati.fattura_acquisto_id,
+        articolo_id: dati.articolo_id,
+        quantita: dati.quantita,
+        prezzo_acquisto_per_stelo: dati.prezzo_acquisto_per_stelo,
+        costi_spalmare_per_stelo: dati.costi_spalmare_per_stelo ?? 0,
+        prezzo_vendita_1: dati.prezzo_vendita_1 ?? 0,
+        prezzo_vendita_2: dati.prezzo_vendita_2 ?? 0,
+        prezzo_vendita_3: dati.prezzo_vendita_3 ?? 0,
+        // lascio a Postgres le colonne generate (totale, totale_con_costi)
+        note: dati.note || null,
+      }])
+      .select()
+      .single();
+
     if (error) throw error;
     return data;
   }
@@ -2406,14 +2465,10 @@ class ApiService {
     ordineId?: number;
   }): Promise<MovimentoMagazzino[]> {
     try {
+      // Usa la vista completa con tutti i nomi joinati
       let query = supabase
-        .from('movimenti_magazzino')
-        .select(`
-          *,
-          gruppi:gruppo_id(nome),
-          colori:colore_id(nome),
-          prodotti:prodotto_id(nome)
-        `)
+        .from('view_movimenti_magazzino_completi')
+        .select(`*`)
         .order('data', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -2448,18 +2503,22 @@ class ApiService {
       }
 
       // Trasforma i dati includendo le informazioni complete
-      const movimentiConNomi = data?.map((movimento: any) => ({
-        ...movimento,
-        gruppo_nome: movimento.gruppi?.nome || `Gruppo ${movimento.gruppo_id || 'N/A'}`,
-        colore_nome: movimento.colori?.nome || null,
-        prodotto_nome: movimento.prodotti?.nome || null,
-        // Crea il nome articolo completo
-        articolo_completo: [
-          movimento.gruppi?.nome,
-          movimento.colori?.nome,
-          movimento.prodotti?.nome
-        ].filter(Boolean).join(' - ') || `Articolo ${movimento.gruppo_id || 'N/A'}`
-      })) || [];
+      const movimentiConNomi = (data || []).map((movimento: any) => {
+        const altezza_nome = movimento.altezza_cm ? `${movimento.altezza_cm} cm` : (movimento.altezza_nome || null);
+        const articolo_completo = [
+          movimento.prodotto_nome || movimento.gruppo_nome,
+          movimento.colore_nome,
+          altezza_nome
+        ].filter(Boolean).join(' - ') || `Articolo ${movimento.gruppo_id || 'N/A'}`;
+
+        return {
+          ...movimento,
+          altezza_nome,
+          articolo_completo,
+          // fallback per compatibilità componenti
+          fattura_numero: movimento.fattura_numero || movimento.fattura_numero_ref || null,
+        };
+      });
 
       console.log('✅ Movimenti caricati con nomi:', movimentiConNomi.length);
       return movimentiConNomi;
@@ -3089,42 +3148,46 @@ class ApiService {
         }
       }
 
-      // 3. Crea la fattura di acquisto
-      const numeroFattura = `FAT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      // 3. Crea la fattura di acquisto (numero generato lato DB)
       const nuovaFattura = await this.createFatturaAcquisto({
-        numero: numeroFattura,
         data: modificheConsegna?.dataConsegnaEffettiva || new Date().toISOString().split('T')[0],
         fornitore_id: ordine.fornitore_id,
         totale: ordine.totale_ordine,
         stato: 'confermata',
         note: `Generata automaticamente da ordine ${ordine.numero_ordine}`
       });
+      const numeroFattura = (nuovaFattura.numero || nuovaFattura.numero_fattura || `FAT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`);
 
-      // 4. Crea i costi analitici della fattura
+      // 4. Crea i costi analitici della fattura usando la funzione dedicata (mappa le tipologie per nome)
+      const costiPerAggiornamento: Array<{ tipo_costo: 'trasporto' | 'commissioni' | 'imballaggi'; importo: number; fornitore_id: number; note?: string; }> = [];
       if (ordine.costo_trasporto > 0) {
-        await supabase.from('costi_fattura').insert({
-          fattura_acquisto_id: nuovaFattura.id,
-          tipologia_costo_id: 1, // Assumendo ID 1 per trasporto
-          fornitore_costo_id: ordine.id_fornitore_trasporto || ordine.fornitore_id,
-          importo: ordine.costo_trasporto
+        costiPerAggiornamento.push({
+          tipo_costo: 'trasporto',
+          importo: ordine.costo_trasporto,
+          fornitore_id: ordine.id_fornitore_trasporto || ordine.fornitore_id,
+          note: `Trasporto da ordine ${ordine.numero_ordine}`
         });
       }
-
       if (ordine.costo_commissioni > 0) {
-        await supabase.from('costi_fattura').insert({
-          fattura_acquisto_id: nuovaFattura.id,
-          tipologia_costo_id: 2, // Assumendo ID 2 per commissioni
-          fornitore_costo_id: ordine.id_fornitore_commissioni || ordine.fornitore_id,
-          importo: ordine.costo_commissioni
+        costiPerAggiornamento.push({
+          tipo_costo: 'commissioni',
+          importo: ordine.costo_commissioni,
+          fornitore_id: ordine.id_fornitore_commissioni || ordine.fornitore_id,
+          note: `Commissioni da ordine ${ordine.numero_ordine}`
         });
       }
-
       if (ordine.costo_imballaggi > 0) {
-        await supabase.from('costi_fattura').insert({
-          fattura_acquisto_id: nuovaFattura.id,
-          tipologia_costo_id: 3, // Assumendo ID 3 per imballaggi
-          fornitore_costo_id: ordine.id_fornitore_imballaggi || ordine.fornitore_id,
-          importo: ordine.costo_imballaggi
+        costiPerAggiornamento.push({
+          tipo_costo: 'imballaggi',
+          importo: ordine.costo_imballaggi,
+          fornitore_id: ordine.id_fornitore_imballaggi || ordine.fornitore_id,
+          note: `Imballaggi da ordine ${ordine.numero_ordine}`
+        });
+      }
+      if (costiPerAggiornamento.length > 0) {
+        await this.aggiornaCostiFattura({
+          fattura_acquisto_id: (nuovaFattura.fattura_id ?? nuovaFattura.id),
+          costi: costiPerAggiornamento
         });
       }
 
@@ -3146,7 +3209,7 @@ class ApiService {
 
         // Crea documento di carico
         await this.createDocumentoCarico({
-          fattura_acquisto_id: nuovaFattura.id,
+          fattura_acquisto_id: (nuovaFattura.fattura_id ?? nuovaFattura.id),
           articolo_id: articolo.id,
           quantita: giacenza.quantita,
           prezzo_acquisto_per_stelo: giacenza.prezzo_acquisto_per_stelo,
@@ -3158,20 +3221,21 @@ class ApiService {
         });
 
         // Crea movimento di magazzino
-        await this.createMovimentoMagazzino({
+        await this.creaMovimentoMagazzino({
           tipo: 'carico',
           data: modificheConsegna?.dataConsegnaEffettiva || new Date().toISOString().split('T')[0],
           quantita: giacenza.quantita,
           prezzo_unitario: giacenza.prezzo_acquisto_per_stelo,
           valore_totale: giacenza.totale_riga,
           gruppo_id: giacenza.gruppo_id,
+          prodotto_id: articolo.prodotto_id,
           colore_id: giacenza.colore_id,
           provenienza_id: giacenza.provenienza_id,
           foto_id: giacenza.foto_id,
           imballo_id: giacenza.imballo_id,
           altezza_id: giacenza.altezza_id,
           qualita_id: giacenza.qualita_id,
-          fattura_id: nuovaFattura.id,
+          fattura_id: (nuovaFattura.fattura_id ?? nuovaFattura.id),
           fattura_numero: numeroFattura,
           fornitore_id: ordine.fornitore_id,
           note: `Da ordine acquisto ${ordine.numero_ordine}`,
@@ -3179,17 +3243,24 @@ class ApiService {
         });
       }
 
+      // Elimina i movimenti virtuali associati all'ordine (non più necessari)
+      await supabase
+        .from('movimenti_magazzino')
+        .delete()
+        .eq('ordine_acquisto_id', ordineId)
+        .eq('tipo', 'carico_virtuale');
+
       // 6. Aggiorna lo stato dell'ordine
       await this.updateOrdineAcquisto(ordineId, {
         stato: 'consegnato',
         data_consegna_effettiva: modificheConsegna?.dataConsegnaEffettiva || new Date().toISOString(),
-        fattura_generata_id: nuovaFattura.id
+        fattura_generata_id: (nuovaFattura.fattura_id ?? nuovaFattura.id)
       });
 
-      console.log('✅ Trasformazione completata:', { fatturaId: nuovaFattura.id, numeroFattura });
+      console.log('✅ Trasformazione completata:', { fatturaId: (nuovaFattura.fattura_id ?? nuovaFattura.id), numeroFattura });
       
       return {
-        fatturaId: nuovaFattura.id,
+        fatturaId: (nuovaFattura.fattura_id ?? nuovaFattura.id),
         numeroFattura: numeroFattura
       };
 
@@ -3217,10 +3288,10 @@ class ApiService {
       .from('prodotti')
       .select('*')
       .eq('nome', caratteristiche.prodotto_nome)
-      .single();
+      .maybeSingle();
 
     // Se non esiste, lo crea
-    if (prodotto.error) {
+    if (!prodotto.data) {
       const { data: nuovoProdotto, error: erroreProdotto } = await supabase
         .from('prodotti')
         .insert([{ nome: caratteristiche.prodotto_nome }])
@@ -3243,10 +3314,10 @@ class ApiService {
       .eq('imballo_id', caratteristiche.imballo_id)
       .eq('altezza_id', caratteristiche.altezza_id)
       .eq('qualita_id', caratteristiche.qualita_id)
-      .single();
+      .maybeSingle();
 
     // Se non esiste, lo crea
-    if (articolo.error) {
+    if (!articolo.data) {
       const { data: nuovoArticolo, error: erroreArticolo } = await supabase
         .from('articoli')
         .insert([{

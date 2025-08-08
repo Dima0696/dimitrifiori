@@ -52,7 +52,7 @@ import { apiService } from '../lib/apiService';
 
 interface MovimentoMagazzino {
   id: number;
-  tipo: 'carico' | 'scarico' | 'distruzione' | 'inventario' | 'trasferimento';
+  tipo: 'carico' | 'scarico' | 'distruzione' | 'inventario' | 'trasferimento' | 'carico_virtuale';
   data: string;
   quantita: number;
   prezzo_unitario?: number;
@@ -79,6 +79,9 @@ interface MovimentoMagazzino {
   // Documenti di riferimento
   fattura_id?: number;
   fattura_numero?: string;
+  fattura_numero_ref?: string;
+  fattura_data?: string;
+  ordine_numero?: string;
   fornitore_id?: number;
   fornitore_nome?: string;
   cliente_id?: number;
@@ -265,21 +268,43 @@ export const MovimentiMagazzino: React.FC = () => {
         coloriData,
         fornitoriData,
         movimentiData,
-        statisticheData
+        statisticheData,
+        giacenzeVirtuali
       ] = await Promise.all([
         apiService.getGruppi(),
         apiService.getProdotti(),
         apiService.getColori(),
         apiService.getFornitori(),
         apiService.getMovimentiMagazzino(),
-        apiService.getStatisticheMovimenti()
+        apiService.getStatisticheMovimenti(),
+        apiService.getGiacenzeVirtuali()
       ]);
       
       setGruppi(gruppiData);
       setProdotti(prodottiData);
       setColori(coloriData);
       setFornitori(fornitoriData);
-      setMovimenti(movimentiData);
+
+      // La vista DB restituisce già i nomi; manteniamo un leggero fallback
+      // Mappa prodotto dai carichi virtuali (per ordini) se mancante
+      const keyFrom = (o: any) => `${o.ordine_acquisto_id || ''}|${o.gruppo_nome || ''}|${o.colore_nome || ''}|${o.altezza_cm || ''}`;
+      const prodottoByVirtualKey: Record<string, string> = Object.create(null);
+      (giacenzeVirtuali || []).forEach((gv: any) => {
+        const k = keyFrom(gv);
+        if (gv.prodotto_nome) prodottoByVirtualKey[k] = gv.prodotto_nome;
+      });
+
+      const movimentiEnriched = (movimentiData || []).map((m: any) => {
+        let prodotto_nome = m.prodotto_nome;
+        if (!prodotto_nome && m.tipo === 'carico_virtuale') {
+          const k = `${m.ordine_acquisto_id || ''}|${m.gruppo_nome || ''}|${m.colore_nome || ''}|${(m.altezza_cm || m.altezza_nome || '').toString().replace(' cm','')}`;
+          if (prodottoByVirtualKey[k]) prodotto_nome = prodottoByVirtualKey[k];
+        }
+        const articolo_completo = m.articolo_completo || [m.gruppo_nome, prodotto_nome, m.colore_nome, m.altezza_nome].filter(Boolean).join(' - ');
+        return { ...m, prodotto_nome, articolo_completo };
+      });
+
+      setMovimenti(movimentiEnriched);
       
       console.log('✅ Movimenti caricati dal database:', movimentiData.length);
       console.log('✅ Statistiche calcolate:', statisticheData);
@@ -390,6 +415,7 @@ export const MovimentiMagazzino: React.FC = () => {
   const getTipoColor = (tipo: string) => {
     switch (tipo) {
       case 'carico': return 'success';
+      case 'carico_virtuale': return 'warning';
       case 'scarico': return 'primary';
       case 'distruzione': return 'error';
       case 'inventario': return 'warning';
@@ -401,6 +427,7 @@ export const MovimentiMagazzino: React.FC = () => {
   const getTipoIcon = (tipo: string) => {
     switch (tipo) {
       case 'carico': return <TrendingUpIcon />;
+      case 'carico_virtuale': return <TrendingUpIcon />;
       case 'scarico': return <TrendingDownIcon />;
       case 'distruzione': return <DeleteIcon />;
       case 'inventario': return <InventoryIcon />;
@@ -412,6 +439,7 @@ export const MovimentiMagazzino: React.FC = () => {
   const getTipoLabel = (tipo: string) => {
     switch (tipo) {
       case 'carico': return 'Carico';
+      case 'carico_virtuale': return 'Carico Virtuale';
       case 'scarico': return 'Scarico';
       case 'distruzione': return 'Distruzione';
       case 'inventario': return 'Inventario';
@@ -626,6 +654,7 @@ export const MovimentiMagazzino: React.FC = () => {
                       >
                         <MenuItem value="">Tutti i tipi</MenuItem>
                         <MenuItem value="carico">Carico</MenuItem>
+                        <MenuItem value="carico_virtuale">Carico Virtuale</MenuItem>
                         <MenuItem value="scarico">Scarico</MenuItem>
                         <MenuItem value="distruzione">Distruzione</MenuItem>
                         <MenuItem value="inventario">Inventario</MenuItem>
@@ -739,11 +768,12 @@ export const MovimentiMagazzino: React.FC = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Data</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Tipo</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Articolo</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Articolo / Prodotto</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Quantità</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Prezzo Unit.</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Valore Tot.</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Riferimento</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Documento</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Fornitore</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Note</TableCell>
                 </TableRow>
               </TableHead>
@@ -763,22 +793,40 @@ export const MovimentiMagazzino: React.FC = () => {
                           {new Date(movimento.created_at).toLocaleTimeString('it-IT')}
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Chip
-                          icon={getTipoIcon(movimento.tipo)}
-                          label={getTipoLabel(movimento.tipo)}
-                          color={getTipoColor(movimento.tipo) as any}
-                          size="small"
-                          sx={{ fontWeight: 600 }}
-                        />
-                      </TableCell>
+                  <TableCell>
+                    <Chip
+                      icon={getTipoIcon(movimento.tipo)}
+                      label={getTipoLabel(movimento.tipo)}
+                      color={getTipoColor(movimento.tipo) as any}
+                      size="small"
+                      sx={{ 
+                        fontWeight: 700,
+                        ...(movimento.tipo === 'carico_virtuale' && { border: '2px solid #f59e0b', bgcolor: '#fff7ed', color: '#b45309' }),
+                        ...(movimento.tipo === 'carico' && { border: '2px solid #10b981', bgcolor: '#ecfdf5', color: '#065f46' }),
+                        ...(movimento.tipo === 'distruzione' && { border: '2px solid #ef4444', bgcolor: '#fef2f2', color: '#991b1b' }),
+                      }}
+                      variant={movimento.tipo === 'carico_virtuale' ? 'outlined' : 'filled'}
+                    />
+                  </TableCell>
                       <TableCell>
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {movimento.articolo_completo || [movimento.gruppo_nome, movimento.prodotto_nome].filter(Boolean).join(' - ') || 'Articolo N/A'}
+                            {(() => {
+                              const top = [movimento.gruppo_nome, movimento.prodotto_nome]
+                                .filter(Boolean)
+                                .join(' - ');
+                              return top ? top.toUpperCase() : 'ARTICOLO N/A';
+                            })()}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {[movimento.colore_nome, movimento.altezza_nome].filter(Boolean).join(' - ') || 'Dettagli N/A'}
+                            {(() => {
+                              const parts = [
+                                movimento.colore_nome || undefined,
+                                movimento.altezza_nome || undefined,
+                                movimento.imballo_nome || undefined,
+                              ].filter(Boolean);
+                              return parts.length ? parts.join(' • ') : 'Dettagli N/A';
+                            })()}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -799,22 +847,30 @@ export const MovimentiMagazzino: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Box>
-                          {movimento.fattura_numero && (
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              {movimento.fattura_numero}
+                          { (movimento.fattura_numero || movimento.fattura_numero_ref) ? (
+                            <>
+                              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                Fattura: {movimento.fattura_numero || movimento.fattura_numero_ref}
+                              </Typography>
+                              {movimento.ordine_numero && (
+                                <Typography variant="caption" color="text.secondary">
+                                  Da ordine: {movimento.ordine_numero}
+                                </Typography>
+                              )}
+                            </>
+                          ) : movimento.ordine_numero ? (
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.main' }}>
+                              Ordine: {movimento.ordine_numero}
                             </Typography>
-                          )}
-                          {movimento.fornitore_nome && (
-                            <Typography variant="caption" color="text.secondary">
-                              {movimento.fornitore_nome}
-                            </Typography>
-                          )}
-                          {movimento.cliente_nome && (
-                            <Typography variant="caption" color="text.secondary">
-                              {movimento.cliente_nome}
-                            </Typography>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">—</Typography>
                           )}
                         </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {movimento.fornitore_nome || '—'}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">

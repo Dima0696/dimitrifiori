@@ -82,6 +82,21 @@ export default function GestioneAcquisti() {
   const [ordineSelezionato, setOrdineSelezionato] = useState<OrdineAcquisto | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
+  // Dialog conferma consegna ordine → fattura
+  const [dialogConsegnaOrdine, setDialogConsegnaOrdine] = useState(false);
+  const [ordinePerConsegna, setOrdinePerConsegna] = useState<OrdineAcquisto | null>(null);
+  const [righeConsegna, setRigheConsegna] = useState<Array<{
+    giacenzaId: number;
+    descrizione: string;
+    quantitaOriginale: number;
+    nuovaQuantita: number;
+    prezzoOriginale: number;
+    nuovoPrezzo: number;
+  }>>([]);
+  const [dataConsegnaEffettiva, setDataConsegnaEffettiva] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [loadingConsegna, setLoadingConsegna] = useState(false);
+  const [erroreConsegna, setErroreConsegna] = useState<string>('');
+
   // Statistiche derivate
   const stats = {
     totaleOrdini: ordini.length,
@@ -267,25 +282,73 @@ export default function GestioneAcquisti() {
     loadOrdiniAcquisto();
   }, []);
 
-  const handleConsegnaOrdine = async (ordineId: number) => {
+  const apriConfermaConsegna = async (ordine: OrdineAcquisto) => {
     try {
-      // Implementeremo dopo - trasforma ordine in fattura
-      await apiService.trasformaOrdineInFattura(ordineId);
-      
-      setSnackbar({
-        open: true,
-        message: 'Ordine trasformato in fattura con successo!',
-        severity: 'success'
+      setErroreConsegna('');
+      setOrdinePerConsegna(ordine);
+      setDialogConsegnaOrdine(true);
+      // Carica righe virtuali per consentire aggiustamenti
+      const gv = await apiService.getGiacenzeVirtualiByOrdine(ordine.id);
+      const righe = (gv || []).map((r: any) => ({
+        giacenzaId: r.id,
+        descrizione: `${r.gruppo_nome || ''} - ${r.nome_prodotto || ''} ${r.colore_nome || ''} ${r.altezza_cm ? `- ${r.altezza_cm} cm` : ''}`.trim(),
+        quantitaOriginale: r.quantita,
+        nuovaQuantita: r.quantita,
+        prezzoOriginale: r.prezzo_acquisto_per_stelo,
+        nuovoPrezzo: r.prezzo_acquisto_per_stelo,
+      }));
+      setRigheConsegna(righe);
+      setDataConsegnaEffettiva(new Date().toISOString().split('T')[0]);
+    } catch (err: any) {
+      setErroreConsegna('Errore nel caricamento delle righe ordine');
+      console.error(err);
+    }
+  };
+
+  const aggiornaRigaConsegna = (index: number, field: 'nuovaQuantita' | 'nuovoPrezzo', value: number) => {
+    setRigheConsegna(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
+  };
+
+  // Consegna diretta senza dialog: usa data odierna e nessuna modifica
+  const consegnaDiretta = async (ordine: OrdineAcquisto) => {
+    try {
+      setLoading(true);
+      const res = await apiService.trasformaOrdineInFattura(ordine.id, {
+        dataConsegnaEffettiva: new Date().toISOString().split('T')[0]
       });
-      
-      await loadOrdiniAcquisto(); // Ricarica la lista
-    } catch (error) {
-      console.error('Errore nella trasformazione:', error);
-      setSnackbar({
-        open: true,
-        message: 'Errore nella trasformazione dell\'ordine',
-        severity: 'error'
-      });
+      setSnackbar({ open: true, message: `Ordine ${ordine.numero_ordine} trasformato in fattura: ${res.numeroFattura}`, severity: 'success' });
+      await loadOrdiniAcquisto();
+    } catch (err: any) {
+      console.error('Errore trasformazione ordine:', err);
+      setSnackbar({ open: true, message: 'Errore nella trasformazione dell\'ordine', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confermaConsegnaOrdine = async () => {
+    if (!ordinePerConsegna) return;
+    try {
+      setLoadingConsegna(true);
+      const payload = {
+        dataConsegnaEffettiva,
+        modificheGiacenze: righeConsegna.map(r => ({
+          giacenzaId: r.giacenzaId,
+          nuovaQuantita: r.nuovaQuantita,
+          nuovoPrezzoAcquisto: r.nuovoPrezzo,
+        }))
+      };
+      const res = await apiService.trasformaOrdineInFattura(ordinePerConsegna.id, payload);
+      setSnackbar({ open: true, message: `Ordine consegnato. Fattura: ${res.numeroFattura}`, severity: 'success' });
+      setDialogConsegnaOrdine(false);
+      setOrdinePerConsegna(null);
+      await loadOrdiniAcquisto();
+    } catch (err: any) {
+      console.error('Errore consegna:', err);
+      setErroreConsegna(err?.message || 'Errore nella trasformazione');
+      setSnackbar({ open: true, message: 'Errore nella trasformazione dell\'ordine', severity: 'error' });
+    } finally {
+      setLoadingConsegna(false);
     }
   };
 
@@ -650,7 +713,7 @@ export default function GestioneAcquisti() {
                                              {ordine.stato === 'ordinato' && (
                         <IconButton 
                           size="small" 
-                          onClick={() => handleConsegnaOrdine(ordine.id)}
+                          onClick={() => consegnaDiretta(ordine)}
                           sx={{ 
                             color: modernColors.success,
                             borderRadius: 1,
@@ -1013,6 +1076,8 @@ export default function GestioneAcquisti() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Dialog Conferma Consegna Ordine rimosso: si usa la Modifica Ordine per allineare i dati prima della trasformazione */}
     </Box>
   );
 }

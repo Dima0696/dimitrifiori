@@ -197,7 +197,7 @@ export default function InserimentoFattureMultiRiga({
     // Container principale neutro
     mainContainer: {
       background: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
-      minHeight: '100vh',
+      minHeight: 'fit-content',
       padding: '12px',
     },
     
@@ -816,7 +816,8 @@ export default function InserimentoFattureMultiRiga({
     try {
       console.log('🗑️ Conferma eliminazione fattura:', fatturaToDelete.fattura_acquisto_id);
       
-      await apiService.eliminaFattura(fatturaToDelete.fattura_acquisto_id);
+      // Usa la procedura completa che elimina anche documenti di carico e movimenti di carico
+      await apiService.eliminaFatturaCarico(fatturaToDelete.fattura_acquisto_id);
       
       setSnackbar({
         open: true,
@@ -832,11 +833,12 @@ export default function InserimentoFattureMultiRiga({
       // Ricarica lista fatture
       await loadData();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Errore eliminazione fattura:', error);
+      const msg = error?.message || 'Errore durante l\'eliminazione della fattura';
       setSnackbar({
         open: true,
-        message: 'Errore durante l\'eliminazione della fattura',
+        message: msg,
         severity: 'error'
       });
     } finally {
@@ -3724,10 +3726,8 @@ export default function InserimentoFattureMultiRiga({
               )}
               <Typography component="span" variant="h5" sx={{ fontWeight: 700 }}>
                 {modalitaOrdini 
-                  ? '🛒 Nuova Ordine Acquisto' 
-                  : modalitaModifica 
-                    ? `✏️ Modifica Fattura: ${formData.numero_fattura}`
-                    : '➕ Nuova Fattura con Carico Multi-Riga'
+                  ? (modalitaModificaOrdine ? `✏️ Modifica Ordine Acquisto ${ordineData?.numero_ordine || ''}` : '🛒 Nuovo Ordine Acquisto')
+                  : (modalitaModifica ? `✏️ Modifica Fattura: ${formData.numero_fattura}` : '➕ Nuova Fattura con Carico Multi-Riga')
                 }
               </Typography>
             </DialogTitle>
@@ -3873,11 +3873,11 @@ export default function InserimentoFattureMultiRiga({
               >
                 {loading 
                   ? (modalitaOrdini ? 
-                      (modalitaModifica ? 'Aggiornamento Ordine...' : 'Creazione Ordine...') :
+                      (modalitaModificaOrdine ? 'Aggiornamento Ordine...' : 'Creazione Ordine...') :
                       (modalitaModifica ? 'Aggiornamento...' : 'Salvataggio...')
                     )
                   : (modalitaOrdini ? 
-                      (modalitaModifica ? 'Aggiorna Ordine' : 'Crea Ordine Acquisto') :
+                      (modalitaModificaOrdine ? 'Aggiorna Ordine' : 'Crea Ordine Acquisto') :
                       (modalitaModifica ? 'Aggiorna Fattura' : 'Salva Fattura')
                     )
                 }

@@ -64,6 +64,10 @@ interface Giacenza {
   giorni_giacenza: number;
   foto_url?: string;
   note?: string;
+  // Estensioni per integrazione virtuali
+  tipo?: 'reale' | 'virtuale';
+  ordine_numero?: string;
+  giorni_alla_consegna?: number;
 }
 
 // Funzioni per icone e colori qualità
@@ -116,6 +120,7 @@ const GiacenzeMagazzino: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [gruppoFilter, setGruppoFilter] = useState<string>('all');
   const [gruppi, setGruppi] = useState<any[]>([]);
+  const [tipoFilter, setTipoFilter] = useState<'tutte' | 'reali' | 'virtuali'>('tutte');
   
   // Stati per modifica imballo
   const [dialogImballoOpen, setDialogImballoOpen] = useState(false);
@@ -150,11 +155,51 @@ const GiacenzeMagazzino: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [giacenzeData, gruppiData] = await Promise.all([
+      const [giacenzeReali, giacenzeVirtuali, gruppiData] = await Promise.all([
         apiService.getGiacenzeMagazzino(),
+        apiService.getGiacenzeVirtuali(),
         apiService.getGruppi()
       ]);
-      setGiacenze(giacenzeData);
+
+      // Normalizza giacenze reali (aggiunge campo tipo)
+      const reals: Giacenza[] = (giacenzeReali || []).map((g: any) => ({
+        ...g,
+        tipo: 'reale' as const,
+      }));
+
+      // Normalizza giacenze virtuali per adattarle all'interfaccia
+      const virtuals: Giacenza[] = (giacenzeVirtuali || []).map((v: any) => ({
+        carico_id: -(v.giacenza_virtuale_id || v.id || Math.floor(Math.random() * 1e6)), // chiave negativa per evitare collisioni
+        fattura_numero: `ORD: ${v.numero_ordine || '-'}`,
+        fattura_data: v.data_consegna_prevista || v.data_ordine || '',
+        fornitore_nome: v.fornitore_nome || '-',
+        articolo_nome: `${v.gruppo_nome || ''} ${v.prodotto_nome || ''} ${v.colore_nome || ''}`.trim(),
+        articolo_id: 0,
+        gruppo_nome: v.gruppo_nome || '-',
+        prodotto_nome: v.prodotto_nome || '-',
+        colore_nome: v.colore_nome || '-',
+        provenienza_nome: v.provenienza_nome || '-',
+        imballo_nome: v.imballo_nome || '-',
+        imballo_id: 0,
+        imballo_quantita: 1,
+        altezza_cm: v.altezza_cm || 0,
+        qualita_nome: v.qualita_nome || undefined,
+        quantita_giacenza: v.quantita_virtuale || 0,
+        prezzo_acquisto_per_stelo: v.prezzo_acquisto_per_stelo || 0,
+        prezzo_costo_finale_per_stelo: v.prezzo_costo_finale_per_stelo || 0,
+        prezzo_vendita_1: v.prezzo_vendita_1 || 0,
+        prezzo_vendita_2: v.prezzo_vendita_2 || 0,
+        prezzo_vendita_3: v.prezzo_vendita_3 || 0,
+        valore_giacenza_finale: v.valore_giacenza_finale || 0,
+        giorni_giacenza: 0, // usiamo giorni_alla_consegna separato
+        foto_url: v.foto_url || undefined,
+        note: v.note || undefined,
+        tipo: 'virtuale',
+        ordine_numero: v.numero_ordine || undefined,
+        giorni_alla_consegna: v.giorni_alla_consegna || undefined,
+      }));
+
+      setGiacenze([...reals, ...virtuals]);
       setGruppi(gruppiData);
       setError('');
     } catch (err) {
@@ -378,8 +423,9 @@ const GiacenzeMagazzino: React.FC = () => {
       giacenza.fornitore_nome.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesGruppo = gruppoFilter === 'all' || giacenza.gruppo_nome === gruppoFilter;
+    const matchesTipo = tipoFilter === 'tutte' || giacenza.tipo === (tipoFilter === 'reali' ? 'reale' : 'virtuale');
     
-    return matchesSearch && matchesGruppo;
+    return matchesSearch && matchesGruppo && matchesTipo;
   });
 
   const getTotalValue = () => {
@@ -671,6 +717,32 @@ const GiacenzeMagazzino: React.FC = () => {
               ))}
             </Select>
           </FormControl>
+
+          {/* Filtro Tipo Giacenza */}
+          <FormControl sx={{ 
+            minWidth: 160,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '12px',
+              background: 'rgba(255, 255, 255, 0.9)',
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: modernColors.primary,
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: modernColors.primary,
+              }
+            }
+          }}>
+            <InputLabel sx={{ color: modernColors.textSecondary, fontWeight: 500 }}>Tipo</InputLabel>
+            <Select
+              value={tipoFilter}
+              onChange={(e) => setTipoFilter(e.target.value as any)}
+              label="Tipo"
+            >
+              <MenuItem value="tutte">Tutte</MenuItem>
+              <MenuItem value="reali">Reali</MenuItem>
+              <MenuItem value="virtuali">Virtuali</MenuItem>
+            </Select>
+          </FormControl>
         </Box>
       </Box>
 
@@ -787,6 +859,14 @@ const GiacenzeMagazzino: React.FC = () => {
                 fontSize: '0.875rem',
                 letterSpacing: '0.5px'
               }}>
+                Tipo
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: modernColors.text,
+                fontSize: '0.875rem',
+                letterSpacing: '0.5px'
+              }}>
                 Azioni
               </TableCell>
             </TableRow>
@@ -878,12 +958,29 @@ const GiacenzeMagazzino: React.FC = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">
-                    {giacenza.fattura_numero}
-                  </Typography>
-                  <Typography variant="caption" color="grey.600">
-                    {new Date(giacenza.fattura_data).toLocaleDateString()}
-                  </Typography>
+                  {giacenza.tipo === 'virtuale' ? (
+                    <Box>
+                      <Typography variant="body2">{giacenza.ordine_numero || 'ORDINE'}</Typography>
+                      <Typography variant="caption" color="grey.600">
+                        Consegna: {giacenza.fattura_data ? new Date(giacenza.fattura_data).toLocaleDateString() : '-'}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Typography variant="body2">{giacenza.fattura_numero}</Typography>
+                      <Typography variant="caption" color="grey.600">
+                        {new Date(giacenza.fattura_data).toLocaleDateString()}
+                      </Typography>
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Chip 
+                    label={giacenza.tipo === 'virtuale' ? 'VIRTUALE' : 'REALE'} 
+                    color={giacenza.tipo === 'virtuale' ? 'warning' : 'success'} 
+                    size="small"
+                    variant="outlined"
+                  />
                 </TableCell>
                 <TableCell>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -893,6 +990,7 @@ const GiacenzeMagazzino: React.FC = () => {
                       color="primary"
                       startIcon={<EditIcon />}
                       onClick={() => apriDialogModificaImballo(giacenza)}
+                      disabled={giacenza.tipo === 'virtuale'}
                       sx={{ minWidth: 'auto', px: 1 }}
                     >
                       Imballo
@@ -903,6 +1001,7 @@ const GiacenzeMagazzino: React.FC = () => {
                       color="info"
                       startIcon={<ListAltIcon />}
                       onClick={() => apriDialogMovimenti(giacenza)}
+                      disabled={giacenza.tipo === 'virtuale'}
                       sx={{ minWidth: 'auto', px: 1 }}
                     >
                       Dettagli
@@ -913,6 +1012,7 @@ const GiacenzeMagazzino: React.FC = () => {
                       color="error"
                       startIcon={<DeleteIcon />}
                       onClick={() => apriDialogDistruzione(giacenza)}
+                      disabled={giacenza.tipo === 'virtuale'}
                       sx={{ minWidth: 'auto', px: 1 }}
                     >
                       Distruggi

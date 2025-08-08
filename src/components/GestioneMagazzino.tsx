@@ -27,18 +27,19 @@ export default function GestioneMagazzino() {
   const modernColors = {
     background: 'rgba(255, 255, 255, 0.95)',
     glass: 'rgba(255, 255, 255, 0.8)',
-    primary: '#2563eb',
-    secondary: '#64748b',
+    // Preferenza utente: arancione come colore principale e spigoli vivi
+    primary: '#f59e0b',
+    secondary: '#6b7280',
     neutral: '#94a3b8',
     text: '#1e293b',
     textSecondary: '#64748b',
-    border: 'rgba(148, 163, 184, 0.2)',
+    border: 'rgba(148, 163, 184, 0.25)',
     gradient: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
-    // Accenti colorati per sezioni
-    accent1: '#3b82f6', // Blue
+    // Accenti
+    accent1: '#f59e0b', // Amber
     accent2: '#10b981', // Emerald 
-    accent3: '#f59e0b', // Amber
-    accent4: '#8b5cf6', // Violet
+    accent3: '#fb923c', // Orange light
+    accent4: '#111827', // Near-black for contrast chips
   };
   
   // Stati per i dati reali
@@ -148,22 +149,22 @@ export default function GestioneMagazzino() {
       label: 'Fatture Acquisti',
       icon: <ReceiptLongIcon />,
       color: modernColors.accent1,
-      bgColor: `${modernColors.accent1}12`,
-      borderColor: `${modernColors.accent1}40`,
+      bgColor: `${modernColors.accent1}14`,
+      borderColor: `${modernColors.accent1}55`,
     },
     {
       label: 'Giacenze',
       icon: <InventoryIcon />,
       color: modernColors.accent2,
-      bgColor: `${modernColors.accent2}12`,
-      borderColor: `${modernColors.accent2}40`,
+      bgColor: `${modernColors.accent2}14`,
+      borderColor: `${modernColors.accent2}55`,
     },
     {
       label: 'Movimenti',
       icon: <AssessmentIcon />,
       color: modernColors.accent4,
-      bgColor: `${modernColors.accent4}12`,
-      borderColor: `${modernColors.accent4}40`,
+      bgColor: `${modernColors.accent4}0F`,
+      borderColor: `${modernColors.accent4}55`,
     },
   ];
 
@@ -333,42 +334,30 @@ export default function GestioneMagazzino() {
               variant="fullWidth"
               sx={{
                 '& .MuiTab-root': {
-                  py: 2,
+                  py: 1.75,
                   minHeight: 'auto',
                   fontWeight: 600,
-                  fontSize: '0.9rem',
+                  fontSize: '0.92rem',
+                  textTransform: 'none',
                   color: modernColors.textSecondary,
                   letterSpacing: '-0.01em',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  position: 'relative',
-                  overflow: 'hidden',
+                  transition: 'all 0.25s ease',
+                  borderRight: `1px solid ${modernColors.border}`,
+                  borderRadius: 0,
                   '&.Mui-selected': {
-                    color: tabs[tabValue]?.color || modernColors.primary,
+                    color: modernColors.text,
                     fontWeight: 700,
-                    background: tabs[tabValue]?.bgColor || `${modernColors.primary}08`,
-                    '&::after': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '2px',
-                      background: tabs[tabValue]?.color || modernColors.primary,
-                      boxShadow: `0 0 8px ${tabs[tabValue]?.color || modernColors.primary}40`,
-                    }
+                    background: tabs[tabValue]?.bgColor || `${modernColors.primary}14`,
+                    outline: `2px solid ${tabs[tabValue]?.color || modernColors.primary}`,
+                    outlineOffset: '-2px',
                   },
                   '&:hover': {
                     color: modernColors.text,
-                    background: `${modernColors.primary}08`,
-                    transform: 'translateY(-1px)',
+                    background: `${modernColors.primary}10`,
                   },
                 },
-                '& .MuiTabs-indicator': {
-                  height: 4,
-                  borderRadius: '3px 3px 0 0',
-                  background: tabs[tabValue]?.color || modernColors.primary,
-                  boxShadow: `0 0 12px ${tabs[tabValue]?.color || modernColors.primary}40`,
-                },
+                // Rimuove la riga/indicatore sotto le tab
+                '& .MuiTabs-indicator': { display: 'none' },
               }}
             >
               {tabs.map((tab, index) => (
@@ -433,3 +422,4 @@ export default function GestioneMagazzino() {
     </Box>
   );
 }
+
