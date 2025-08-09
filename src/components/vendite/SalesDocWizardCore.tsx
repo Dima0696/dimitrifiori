@@ -16,12 +16,18 @@ import {
   FormControl,
   IconButton,
   Chip,
-  Stack
+  Stack,
+  Tooltip,
+  Divider
 } from '@mui/material';
 import { createFilterOptions } from '@mui/material/Autocomplete';
 import PrintIcon from '@mui/icons-material/Print';
 import ShareIcon from '@mui/icons-material/Share';
 import DeleteIcon from '@mui/icons-material/Delete';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { apiService, type Cliente } from '../../lib/apiService';
 import { useNavigate } from 'react-router-dom';
 import { safeBack } from '../../lib/navigation';
@@ -56,6 +62,18 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const summaryRef = React.useRef<HTMLDivElement>(null);
+  const [quickEdit, setQuickEdit] = React.useState<boolean>(true);
+
+  const accent = '#7c3aed';
+  const fieldSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 0,
+      background: 'rgba(255,255,255,0.9)'
+    },
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(124,58,237,0.25)' },
+    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(124,58,237,0.45)' },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: accent, boxShadow: `0 0 0 2px ${accent}33` },
+  } as const;
 
   React.useEffect(()=>{
     Promise.all([
@@ -153,6 +171,26 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
   }, 0);
   const totale = imponibile + (mode==='fattura' ? totaleIva : 0);
 
+  // KPI: ricarico medio (markup) e globale
+  const kpi = React.useMemo(() => {
+    let qtyTot = 0;
+    let markupWeightedSum = 0;
+    let totalCost = 0;
+    validRows.forEach(r => {
+      const q = Number(r.quantita||0);
+      const costUnit = Number(r.giacenza?.prezzo_costo_finale_per_stelo || r.giacenza?.prezzo_acquisto_per_stelo || 0);
+      const priceUnit = Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100);
+      if (q > 0 && costUnit > 0) {
+        qtyTot += q;
+        markupWeightedSum += ((priceUnit - costUnit) / costUnit) * 100 * q;
+        totalCost += costUnit * q;
+      }
+    });
+    const markupWeighted = qtyTot > 0 ? (markupWeightedSum / qtyTot) : 0;
+    const markupGlobal = totalCost > 0 ? ((imponibile - totalCost) / totalCost) * 100 : 0;
+    return { qtyTot, markupWeighted, markupGlobal, totalCost };
+  }, [validRows, imponibile]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -165,6 +203,29 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
       await navigator.clipboard.writeText(text);
       alert('Dettagli copiati negli appunti');
     }
+  };
+
+  const handleWhatsApp = () => {
+    const rowsText = validRows.map(r => {
+      const g = r.giacenza || {} as any;
+      const q = Number(r.quantita||0);
+      const unit = Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100);
+      return `- ${g.gruppo_nome || ''} ${g.prodotto_nome || ''} ${g.colore_nome || ''} ${g.altezza_cm || ''}cm x${q} a €${unit.toFixed(3)}`;
+    }).join('%0A');
+    const msg = `*${mode==='ddt' ? 'DDT' : 'Fattura'} in preparazione*%0ACliente: ${encodeURIComponent(cliente?.nome || '')}%0AData: ${data}%0A%0A${rowsText}%0A%0ATotale: € ${totale.toFixed(2)}%0ARicarico medio: ${kpi.markupWeighted.toFixed(1)}%`;
+    const url = `https://wa.me/?text=${msg}`;
+    window.open(url, '_blank');
+  };
+
+  const handleCopyRecap = async () => {
+    const lines = validRows.map(r => {
+      const g = r.giacenza || {} as any;
+      const q = Number(r.quantita||0);
+      const unit = Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100);
+      return `- ${g.gruppo_nome || ''} ${g.prodotto_nome || ''} ${g.colore_nome || ''} ${g.altezza_cm || ''}cm x${q} a €${unit.toFixed(3)}`;
+    }).join('\n');
+    const txt = `${mode==='ddt' ? 'DDT' : 'Fattura'}\nCliente: ${cliente?.nome || ''}\nData: ${data}\n\n${lines}\n\nImponibile: € ${imponibile.toFixed(2)}\nTotale: € ${totale.toFixed(2)}\nRicarico medio: ${kpi.markupWeighted.toFixed(1)}% (globale ${kpi.markupGlobal.toFixed(1)}%)`;
+    await navigator.clipboard.writeText(txt);
   };
 
   // Scadenze per DDT non salvate come campi: annotiamo in note (usate poi per differita)
@@ -181,6 +242,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
           prezzo_unitario: Number(r.prezzo||0),
           prezzo_finale: Number(r.prezzo||0),
           iva_percentuale: Number(r.iva||0),
+          documento_carico_id: r.giacenza?.carico_id ?? null,
           articolo_id: r.giacenza?.articolo_id ?? null,
           gruppo_id: r.giacenza?.gruppo_id ?? null,
           prodotto_id: r.giacenza?.prodotto_id ?? null,
@@ -215,6 +277,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
           sconto_percentuale: Number(r.sconto||0),
           prezzo_finale: Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100),
           iva_percentuale: Number(r.iva||0),
+          documento_carico_id: r.giacenza?.carico_id ?? null,
           articolo_id: r.giacenza?.articolo_id ?? null,
           gruppo_id: r.giacenza?.gruppo_id ?? null,
           prodotto_id: r.giacenza?.prodotto_id ?? null,
@@ -247,18 +310,38 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
         <Typography variant="h5" sx={{ fontWeight: 800 }}>
           {mode === 'ddt' ? (existing?.id ? 'Modifica DDT' : 'Nuovo DDT') : 'Nuova Fattura'}
         </Typography>
-        {active === 2 && (
-          <Stack direction="row" spacing={1}>
-            <Button startIcon={<PrintIcon />} onClick={handlePrint} sx={{ borderRadius: 0 }} variant="outlined">Stampa</Button>
-            <Button startIcon={<ShareIcon />} onClick={handleShare} sx={{ borderRadius: 0 }} variant="outlined">Condividi</Button>
-          </Stack>
-        )}
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Stampa"><span><Button startIcon={<PrintIcon />} onClick={handlePrint} sx={{ borderRadius: 0 }} variant="outlined">Stampa</Button></span></Tooltip>
+          <Tooltip title="Condividi"><span><Button startIcon={<ShareIcon />} onClick={handleShare} sx={{ borderRadius: 0 }} variant="outlined">Condividi</Button></span></Tooltip>
+          <Tooltip title="WhatsApp"><span><Button startIcon={<WhatsAppIcon />} onClick={handleWhatsApp} sx={{ borderRadius: 0 }} variant="outlined" color="success">WhatsApp</Button></span></Tooltip>
+          <Tooltip title="Copia riepilogo"><span><Button startIcon={<ContentCopyIcon />} onClick={handleCopyRecap} sx={{ borderRadius: 0 }} variant="outlined">Copia</Button></span></Tooltip>
+        </Stack>
       </Box>
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 0 }}>
         <Stepper activeStep={active} alternativeLabel>
           {steps.map(s => (<Step key={s}><StepLabel>{s}</StepLabel></Step>))}
         </Stepper>
       </Paper>
+
+      {/* KPI header */}
+      <Box sx={{ display:'grid', gridTemplateColumns:{ xs:'1fr', md:'1fr 1fr 1fr 1fr'}, gap:1, mb:2 }}>
+        <Paper variant="outlined" sx={{ p:1.5, borderLeft:`4px solid ${accent}`, borderRadius:0 }}>
+          <Typography variant="caption" sx={{ color:'#64748b' }}>Steli totali</Typography>
+          <Typography variant="h6" sx={{ fontWeight:800 }}>{kpi.qtyTot}</Typography>
+        </Paper>
+        <Paper variant="outlined" sx={{ p:1.5, borderLeft:`4px solid ${kpi.markupWeighted>=50?'#16a34a':kpi.markupWeighted>=20?'#f59e0b':'#ef4444'}`, borderRadius:0 }}>
+          <Typography variant="caption" sx={{ color:'#64748b' }}>Ricarico medio ponderato</Typography>
+          <Typography variant="h6" sx={{ fontWeight:800, color: kpi.markupWeighted>=50?'#16a34a':kpi.markupWeighted>=20?'#b45309':'#b91c1c' }}>{kpi.markupWeighted.toFixed(1)}%</Typography>
+        </Paper>
+        <Paper variant="outlined" sx={{ p:1.5, borderLeft:`4px solid ${kpi.markupGlobal>=50?'#16a34a':kpi.markupGlobal>=20?'#f59e0b':'#ef4444'}`, borderRadius:0 }}>
+          <Typography variant="caption" sx={{ color:'#64748b' }}>Ricarico globale</Typography>
+          <Typography variant="h6" sx={{ fontWeight:800, color: kpi.markupGlobal>=50?'#16a34a':kpi.markupGlobal>=20?'#b45309':'#b91c1c' }}>{kpi.markupGlobal.toFixed(1)}%</Typography>
+        </Paper>
+        <Paper variant="outlined" sx={{ p:1.5, borderLeft:`4px solid ${accent}`, borderRadius:0 }}>
+          <Typography variant="caption" sx={{ color:'#64748b' }}>Totale documento</Typography>
+          <Typography variant="h6" sx={{ fontWeight:800 }}>€ {totale.toFixed(2)}</Typography>
+        </Paper>
+      </Box>
 
       {active===0 && (
         <Paper variant="outlined" sx={{ p: 2 }}>
@@ -270,18 +353,25 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
       )}
 
       {active===1 && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 0 }}>
           <Grid container spacing={2} sx={{ mb: 1 }}>
             {mode==='ddt' && (
               <>
-                <Grid item xs={12} md={4}><TextField fullWidth label="Scadenza" type="date" value={dataScadenza} onChange={e=>setDataScadenza(e.target.value)} InputLabelProps={{ shrink:true }} /></Grid>
-                <Grid item xs={12} md={4}><TextField fullWidth label="Destinazione" value={destinazione} onChange={e=>setDestinazione(e.target.value)} /></Grid>
-                <Grid item xs={12} md={4}><TextField fullWidth label="Spedizioniere" value={spedizioniere} onChange={e=>setSpedizioniere(e.target.value)} /></Grid>
+                <Grid item xs={12} md={4}><TextField fullWidth label="Scadenza" type="date" value={dataScadenza} onChange={e=>setDataScadenza(e.target.value)} InputLabelProps={{ shrink:true }} sx={fieldSx} /></Grid>
+                <Grid item xs={12} md={4}><TextField fullWidth label="Destinazione" value={destinazione} onChange={e=>setDestinazione(e.target.value)} sx={fieldSx} /></Grid>
+                <Grid item xs={12} md={4}><TextField fullWidth label="Spedizioniere" value={spedizioniere} onChange={e=>setSpedizioniere(e.target.value)} sx={fieldSx} /></Grid>
               </>
             )}
             {/* Metodo pagamento spostato nel riepilogo come richiesto */}
-            <Grid item xs={12}><TextField fullWidth label="Note" value={note} onChange={e=>setNote(e.target.value)} /></Grid>
+            <Grid item xs={12}><TextField fullWidth label="Note" value={note} onChange={e=>setNote(e.target.value)} sx={fieldSx} /></Grid>
           </Grid>
+          <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', mb:1 }}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Chip size="small" label={quickEdit ? 'Correzione rapida: ON' : 'Correzione rapida: OFF'} color={quickEdit ? 'primary':'default'} onClick={()=>setQuickEdit(v=>!v)} />
+              <Typography variant="caption" sx={{ color:'#64748b' }}>Incrementi/decrementi in multipli di imballo</Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ color:'#64748b' }}>Suggerimento: usa i chip L1/L2/L3 per riempire i prezzi</Typography>
+          </Box>
           {righe.map((r,idx)=> (
             <Grid key={idx} container spacing={1} alignItems="center" sx={{ mb:1 }}>
               <Grid item xs={12} md={4}>
@@ -316,10 +406,19 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
                   inputProps={{ min: r.imballoQuant || r.giacenza?.imballo_quantita || 1, step: r.imballoQuant || r.giacenza?.imballo_quantita || 1 }}
                   error={!!r.giacenza && (Number(r.quantita||0) % Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1) !== 0)}
                   helperText={r.giacenza ? `Imballo: ${r.imballoQuant || r.giacenza?.imballo_quantita || 1} steli` : ''}
+                  sx={fieldSx}
                 />
               </Grid>
-              <Grid item xs={6} md={1.5 as any}><TextField label="Prezzo" type="number" value={r.prezzo} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], prezzo:e.target.value}; setRighe(arr);} } /></Grid>
-              <Grid item xs={6} md={1.5 as any}><TextField label="Sconto %" type="number" value={r.sconto} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], sconto:e.target.value}; setRighe(arr);} } /></Grid>
+              {quickEdit && (
+                <Grid item xs={12} md={'auto' as any}>
+                  <Stack direction="row" spacing={1}>
+                    <Tooltip title="- imballo"><span><IconButton onClick={()=>{ const arr=[...righe]; const step=Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1); const cur=Number(r.quantita||0); const next=Math.max(0, cur-step); arr[idx]={...arr[idx], quantita:String(next)}; setRighe(arr); }}><RemoveCircleOutlineIcon /></IconButton></span></Tooltip>
+                    <Tooltip title="+ imballo"><span><IconButton color="success" onClick={()=>{ const arr=[...righe]; const step=Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1); const cur=Number(r.quantita||0); const next=cur+step; arr[idx]={...arr[idx], quantita:String(next)}; setRighe(arr); }}><AddCircleOutlineIcon /></IconButton></span></Tooltip>
+                  </Stack>
+                </Grid>
+              )}
+              <Grid item xs={6} md={1.5 as any}><TextField label="Prezzo" type="number" value={r.prezzo} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], prezzo:e.target.value}; setRighe(arr);} } sx={fieldSx} /></Grid>
+              <Grid item xs={6} md={1.5 as any}><TextField label="Sconto %" type="number" value={r.sconto} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], sconto:e.target.value}; setRighe(arr);} } sx={fieldSx} /></Grid>
               <Grid item xs={6} md={1.5 as any}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Listino</InputLabel>
@@ -347,22 +446,43 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
                 </Stack>
               </Grid>
               {mode==='fattura' && (
-                <Grid item xs={6} md={1.5 as any}><TextField label="IVA %" type="number" value={r.iva} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], iva:e.target.value}; setRighe(arr);} } /></Grid>
+                <Grid item xs={6} md={1.5 as any}><TextField label="IVA %" type="number" value={r.iva} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], iva:e.target.value}; setRighe(arr);} } sx={fieldSx} /></Grid>
               )}
               <Grid item xs={12} md={'auto' as any}>
-                <IconButton onClick={()=>removeRiga(idx)}><DeleteIcon /></IconButton>
+                <Stack direction="row" spacing={1}>
+                  <Tooltip title="Duplica riga"><span><IconButton onClick={()=>{ const arr=[...righe]; arr.splice(idx+1,0,{...r}); setRighe(arr); }}><ContentCopyIcon fontSize="small" /></IconButton></span></Tooltip>
+                  <Tooltip title="Elimina riga"><span><IconButton onClick={()=>removeRiga(idx)}><DeleteIcon /></IconButton></span></Tooltip>
+                </Stack>
               </Grid>
               <Grid item xs={12}>
-                <Chip size="small" color={r.giacenza && (Number(r.quantita||0) % Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1) !== 0) ? 'error' : 'default'} label={`Subtotale riga: € ${(Number(r.quantita||0)*Number(r.prezzo||0)*(1-Number(r.sconto||0)/100)).toFixed(2)}${r.giacenza ? ` • Imballo x${r.imballoQuant || r.giacenza?.imballo_quantita || 1}` : ''}`} />
+                {(() => {
+                  const q = Number(r.quantita||0);
+                  const pu = Number(r.prezzo||0)*(1-Number(r.sconto||0)/100);
+                  const cu = Number(r.giacenza?.prezzo_costo_finale_per_stelo || r.giacenza?.prezzo_acquisto_per_stelo || 0);
+                  const subtotal = q*pu;
+                  const markup = cu>0 ? ((pu-cu)/cu)*100 : 0;
+                  const color = markup>=50?'success':markup>=20?'warning':'error';
+                  return (
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Chip size="small" color={r.giacenza && (Number(r.quantita||0) % Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1) !== 0) ? 'error' : 'default'} label={`Subtotale riga: € ${subtotal.toFixed(2)}${r.giacenza ? ` • Imballo x${r.imballoQuant || r.giacenza?.imballo_quantita || 1}` : ''}`} />
+                      <Chip size="small" color={color as any} label={`Ricarico riga: ${markup.toFixed(1)}%`} />
+                    </Stack>
+                  );
+                })()}
               </Grid>
             </Grid>
           ))}
-          <Button size="small" onClick={addRiga}>Aggiungi riga</Button>
+          <Divider sx={{ my:1 }} />
+          <Stack direction="row" spacing={1}>
+            <Button size="small" onClick={addRiga} variant="outlined" sx={{ borderRadius:0, borderColor:accent, color:accent }}>Aggiungi riga</Button>
+            <Chip size="small" variant="outlined" label={`Costo totale: € ${kpi.totalCost.toFixed(2)}`} />
+            <Chip size="small" color={(kpi.markupGlobal>=50?'success':kpi.markupGlobal>=20?'warning':'error') as any} label={`Ricarico globale: ${kpi.markupGlobal.toFixed(1)}%`} />
+          </Stack>
         </Paper>
       )}
 
       {active===2 && (
-        <Paper variant="outlined" sx={{ p: 2 }} ref={summaryRef}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 0 }} ref={summaryRef}>
           <Typography variant="subtitle1" sx={{ fontWeight:700, mb:1 }}>Riepilogo</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
@@ -381,6 +501,10 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
               {mode==='fattura' && <Typography variant="body2">IVA: € {totaleIva.toFixed(2)}</Typography>}
               <Typography variant="h6" sx={{ fontWeight:800, mt:1 }}>Totale: € {totale.toFixed(2)}</Typography>
               {mode==='ddt' && <Typography variant="body2">Scadenza: {dataScadenza}</Typography>}
+              <Box sx={{ mt:1, display:'flex', gap:1, flexWrap:'wrap' }}>
+                <Chip size="small" label={`Ricarico medio: ${kpi.markupWeighted.toFixed(1)}%`} color={(kpi.markupWeighted>=50?'success':kpi.markupWeighted>=20?'warning':'error') as any} />
+                <Chip size="small" label={`Ricarico globale: ${kpi.markupGlobal.toFixed(1)}%`} variant="outlined" />
+              </Box>
               {mode==='fattura' && (
                 <Box sx={{ display:'flex', gap:1, alignItems:'center', mt: 1 }}>
                   <FormControl size="small" sx={{ minWidth: 180 }}>

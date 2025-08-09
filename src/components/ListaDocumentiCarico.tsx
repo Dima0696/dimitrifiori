@@ -86,6 +86,7 @@ interface MovimentoMagazzino {
   fornitore_nome?: string;
   cliente_id?: number;
   cliente_nome?: string;
+  ddt_numero?: string;
   
   // Metadati
   note?: string;
@@ -772,8 +773,8 @@ export const MovimentiMagazzino: React.FC = () => {
                   <TableCell sx={{ fontWeight: 700 }}>Quantità</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Prezzo Unit.</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Valore Tot.</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Documento</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Fornitore</TableCell>
+                   <TableCell sx={{ fontWeight: 700 }}>Documento</TableCell>
+                   <TableCell sx={{ fontWeight: 700 }}>Cliente/Fornitore</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Note</TableCell>
                 </TableRow>
               </TableHead>
@@ -858,6 +859,10 @@ export const MovimentiMagazzino: React.FC = () => {
                                 </Typography>
                               )}
                             </>
+                          ) : movimento.ddt_numero ? (
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'info.main' }}>
+                              DDT: {movimento.ddt_numero}
+                            </Typography>
                           ) : movimento.ordine_numero ? (
                             <Typography variant="body2" sx={{ fontWeight: 700, color: 'warning.main' }}>
                               Ordine: {movimento.ordine_numero}
@@ -868,9 +873,16 @@ export const MovimentiMagazzino: React.FC = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2">
-                          {movimento.fornitore_nome || '—'}
-                        </Typography>
+                        <Box>
+                          {movimento.cliente_nome && (
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              Cliente: {movimento.cliente_nome}
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="text.secondary">
+                            {movimento.fornitore_nome ? `Fornitore: ${movimento.fornitore_nome}` : (movimento.cliente_nome ? '' : '—')}
+                          </Typography>
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">

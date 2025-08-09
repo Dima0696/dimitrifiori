@@ -163,6 +163,7 @@ export interface MovimentoMagazzino {
   fornitore_nome?: string;
   cliente_id?: number;
   cliente_nome?: string;
+  ddt_numero?: string;
   ordine_acquisto_id?: number;  // NUOVO: riferimento agli ordini acquisto
   
   // Metadati
@@ -2092,11 +2093,48 @@ class ApiService {
         };
       });
 
-      // Eventualmente qui si potrebbero aggiungere altri tipi di movimento 
-      // (scarichi, distruzioni, etc.) se implementati in futuro
+      // Recupera la classificazione dell'articolo per filtrare gli scarichi
+      const { data: articolo, error: errArt } = await supabase
+        .from('articoli')
+        .select('id, gruppo_id, prodotto_id, colore_id, provenienza_id, foto_id, imballo_id, altezza_id, qualita_id')
+        .eq('id', articolo_id)
+        .single();
+      if (errArt) throw errArt;
 
-      console.log(`✅ Trovati ${movimentiCarico.length} movimenti per articolo ${articolo_id}`);
-      return movimentiCarico;
+      // Scarichi/distruzioni registrati nella vista movimenti completa
+      let movimentiScarico: MovimentoMagazzino[] = [];
+      if (articolo) {
+        let scarichiQuery = supabase
+          .from('view_movimenti_magazzino_completi')
+          .select('*')
+          .eq('tipo', 'scarico')
+          .eq('gruppo_id', (articolo as any).gruppo_id)
+          .eq('prodotto_id', (articolo as any).prodotto_id)
+          .eq('colore_id', (articolo as any).colore_id)
+          .eq('imballo_id', (articolo as any).imballo_id)
+          .eq('altezza_id', (articolo as any).altezza_id);
+
+        const { data: scarichi, error: errScar } = await scarichiQuery;
+        if (errScar) {
+          console.warn('⚠️ Errore lettura scarichi dalla vista, continuo con soli carichi:', errScar.message);
+          movimentiScarico = [];
+        } else {
+          // Normalizza alcuni campi per allinearli ai carichi
+          movimentiScarico = (scarichi || []).map((s: any) => ({
+            ...s,
+            // unifica numero fattura
+            fattura_numero: s.fattura_numero ?? s.fattura_numero_ref ?? null,
+            // alias altezza nome
+            altezza_nome: s.altezza_nome ?? (s.altezza_cm ? `${s.altezza_cm} cm` : null),
+          })) as any;
+        }
+      }
+
+      const unione = [...movimentiCarico, ...movimentiScarico]
+        .sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
+      console.log(`✅ Trovati ${unione.length} movimenti totali per articolo ${articolo_id}`);
+      return unione as any;
 
     } catch (error) {
       console.error('Errore nel caricamento movimenti articolo:', error);

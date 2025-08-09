@@ -22,7 +22,8 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Autocomplete
+  Autocomplete,
+  Tooltip
 } from '@mui/material';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
@@ -36,6 +37,8 @@ import AddCardIcon from '@mui/icons-material/AddCard';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import EventIcon from '@mui/icons-material/Event';
 import { apiService, type OrdineVendita, type DdtVendita, type FatturaVendita, type NotaCreditoVendita, type Cliente } from '../lib/apiService';
+import ModernSearchBar from './ui/ModernSearchBar';
+import SegmentedControl from './ui/SegmentedControl';
 import EmailIcon from '@mui/icons-material/Email';
 import { useNavigate } from 'react-router-dom';
 
@@ -67,6 +70,12 @@ export default function GestioneVendite() {
   const [noteCredito, setNoteCredito] = React.useState<NotaCreditoVendita[]>([]);
   const [clienti, setClienti] = React.useState<Cliente[]>([]);
   const [dialogIncasso, setDialogIncasso] = React.useState<{ open: boolean; fattura?: FatturaVendita | null; importo: string }>({ open: false, fattura: null, importo: '' });
+  const [q, setQ] = React.useState('');
+  const [clienteFiltro, setClienteFiltro] = React.useState<Cliente | null>(null);
+  const [statoFiltro, setStatoFiltro] = React.useState<string>('');
+  const [periodo, setPeriodo] = React.useState<'oggi'|'settimana'|'mese'|'anno'|'tutto'>('tutto');
+  const [dataDa, setDataDa] = React.useState<string>('');
+  const [dataA, setDataA] = React.useState<string>('');
   const [dialogOrdine, setDialogOrdine] = React.useState<{ open: boolean; cliente: Cliente | null; data: string; note: string; righe: Array<{ quantita: string; prezzo: string; sconto: string }>; }>({ open: false, cliente: null, data: new Date().toISOString().slice(0,10), note: '', righe: [{ quantita: '1', prezzo: '0', sconto: '0' }] });
   const [dialogDDT, setDialogDDT] = React.useState<{ open: boolean; cliente: Cliente | null; data: string; note: string; righe: Array<{ quantita: string; prezzo: string }>; }>({ open: false, cliente: null, data: new Date().toISOString().slice(0,10), note: '', righe: [{ quantita: '1', prezzo: '0' }] });
   const [dialogFattura, setDialogFattura] = React.useState<{ open: boolean; cliente: Cliente | null; data: string; note: string; righe: Array<{ quantita: string; prezzo: string }>; }>({ open: false, cliente: null, data: new Date().toISOString().slice(0,10), note: '', righe: [{ quantita: '1', prezzo: '0' }] });
@@ -358,6 +367,35 @@ export default function GestioneVendite() {
         <Box sx={{ p: 2.5 }}>
           {loading && <CircularProgress size={24} />}
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <ModernSearchBar
+            placeholder={tab===0?'Cerca ordini...':tab===1?'Cerca DDT...':tab===2?'Cerca fatture...':'Cerca...'}
+            value={q}
+            onChange={setQ}
+            onClear={()=>setQ('')}
+            chips={[{ label: 'Tutti', onClick: ()=>{ setStatoFiltro(''); setClienteFiltro(null);} }]}
+            extra={
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Autocomplete size="small" sx={{ minWidth: 260 }} options={clienti} value={clienteFiltro}
+                  onChange={(_,v)=>setClienteFiltro(v)} getOptionLabel={(o)=>o?.nome||''}
+                  renderInput={(p)=><TextField {...p} label="Cliente" />}
+                />
+                <TextField size="small" label="Stato" value={statoFiltro} onChange={(e)=>setStatoFiltro(e.target.value)} sx={{ minWidth: 160 }} />
+                <SegmentedControl
+                  value={periodo}
+                  onChange={(v)=>setPeriodo(v as any)}
+                  options={[
+                    { label:'Oggi', value:'oggi' },
+                    { label:'Sett.', value:'settimana' },
+                    { label:'Mese', value:'mese' },
+                    { label:'Anno', value:'anno' },
+                    { label:'Tutto', value:'tutto' },
+                  ]}
+                />
+                <TextField size="small" type="date" label="Da" value={dataDa} onChange={(e)=>setDataDa(e.target.value)} InputLabelProps={{ shrink:true }} />
+                <TextField size="small" type="date" label="A" value={dataA} onChange={(e)=>setDataA(e.target.value)} InputLabelProps={{ shrink:true }} />
+              </Stack>
+            }
+          />
           {tab === 0 && (
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: colors.text }}>Ordini cliente</Typography>
@@ -372,7 +410,25 @@ export default function GestioneVendite() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {ordini.map(o => (
+                  {ordini
+                    .filter(o => (q==='' || String(o.numero_ordine||o.id).includes(q) || (o.cliente_nome||'').toLowerCase().includes(q.toLowerCase())))
+                    .filter(o => (!clienteFiltro || o.cliente_id===clienteFiltro.id))
+                    .filter(o => (!statoFiltro || o.stato===statoFiltro))
+                    .filter(o => {
+                      const d = o.data_ordine;
+                      if (dataDa && d < dataDa) return false;
+                      if (dataA && d > dataA) return false;
+                      if (periodo==='oggi') return d === new Date().toISOString().slice(0,10);
+                      if (periodo==='settimana') {
+                        const today = new Date();
+                        const start = new Date(today); start.setDate(today.getDate()-6);
+                        return d >= start.toISOString().slice(0,10) && d <= today.toISOString().slice(0,10);
+                      }
+                      if (periodo==='mese') return d.slice(0,7) === new Date().toISOString().slice(0,7);
+                      if (periodo==='anno') return d.slice(0,4) === new Date().getFullYear().toString();
+                      return true;
+                    })
+                    .map(o => (
                     <TableRow key={o.id} hover>
                       <TableCell>{o.numero_ordine || o.id}</TableCell>
                       <TableCell>{o.data_ordine}</TableCell>
@@ -405,7 +461,25 @@ export default function GestioneVendite() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {ddt.map(d => (
+                  {ddt
+                    .filter(d => (q==='' || String(d.numero_ddt||d.id).includes(q) || (d.cliente_nome||'').toLowerCase().includes(q.toLowerCase())))
+                    .filter(d => (!clienteFiltro || d.cliente_id===clienteFiltro.id))
+                    .filter(d => (!statoFiltro || d.stato===statoFiltro))
+                    .filter(d => {
+                      const data = d.data_ddt;
+                      if (dataDa && data < dataDa) return false;
+                      if (dataA && data > dataA) return false;
+                      if (periodo==='oggi') return data === new Date().toISOString().slice(0,10);
+                      if (periodo==='settimana') {
+                        const today = new Date();
+                        const start = new Date(today); start.setDate(today.getDate()-6);
+                        return data >= start.toISOString().slice(0,10) && data <= today.toISOString().slice(0,10);
+                      }
+                      if (periodo==='mese') return data.slice(0,7) === new Date().toISOString().slice(0,7);
+                      if (periodo==='anno') return data.slice(0,4) === new Date().getFullYear().toString();
+                      return true;
+                    })
+                    .map(d => (
                     <TableRow key={d.id} hover>
                       <TableCell>{d.numero_ddt || d.id}</TableCell>
                       <TableCell>{d.data_ddt}</TableCell>
@@ -443,7 +517,25 @@ export default function GestioneVendite() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {fatture.map(f => (
+                  {fatture
+                    .filter(f => (q==='' || String(f.numero_fattura||f.id).includes(q) || (f.cliente_nome||'').toLowerCase().includes(q.toLowerCase())))
+                    .filter(f => (!clienteFiltro || f.cliente_id===clienteFiltro.id))
+                    .filter(f => (!statoFiltro || f.stato===statoFiltro))
+                    .filter(f => {
+                      const data = f.data_fattura;
+                      if (dataDa && data < dataDa) return false;
+                      if (dataA && data > dataA) return false;
+                      if (periodo==='oggi') return data === new Date().toISOString().slice(0,10);
+                      if (periodo==='settimana') {
+                        const today = new Date();
+                        const start = new Date(today); start.setDate(today.getDate()-6);
+                        return data >= start.toISOString().slice(0,10) && data <= today.toISOString().slice(0,10);
+                      }
+                      if (periodo==='mese') return data.slice(0,7) === new Date().toISOString().slice(0,7);
+                      if (periodo==='anno') return data.slice(0,4) === new Date().getFullYear().toString();
+                      return true;
+                    })
+                    .map(f => (
                     <TableRow key={f.id} hover>
                       <TableCell>{f.numero_fattura || f.id}</TableCell>
                       <TableCell>{f.data_fattura}</TableCell>

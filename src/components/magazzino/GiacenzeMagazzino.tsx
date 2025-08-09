@@ -1105,15 +1105,15 @@ const GiacenzeMagazzino: React.FC = () => {
           ) : (
             <Paper elevation={0} sx={{ border: '1px solid', borderColor: 'grey.300' }}>
               <Table size="small">
-                <TableHead>
+                    <TableHead>
                   <TableRow sx={{ bgcolor: 'grey.50' }}>
                     <TableCell sx={{ fontWeight: 600 }}>Data</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Tipo</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Quantità</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Prezzo Unit.</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Valore Tot.</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Fattura/Doc.</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Fornitore</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Fattura/DDT</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Cliente/Fornitore</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Note</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1151,16 +1151,16 @@ const GiacenzeMagazzino: React.FC = () => {
                           {movimento.valore_totale ? `€ ${movimento.valore_totale.toFixed(2)}` : '-'}
                         </Typography>
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {movimento.fattura_numero || '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {movimento.fornitore_nome || '-'}
-                        </Typography>
-                      </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {movimento.fattura_numero || movimento.ddt_numero || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {movimento.tipo==='scarico' ? (movimento.cliente_nome || '-') : (movimento.fornitore_nome || '-')}
+                          </Typography>
+                        </TableCell>
                       <TableCell>
                         <Typography variant="caption" color="grey.600">
                           {movimento.note || '-'}
