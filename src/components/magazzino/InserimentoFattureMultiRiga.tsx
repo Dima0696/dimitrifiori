@@ -1103,13 +1103,13 @@ export default function InserimentoFattureMultiRiga({
       }));
     } else {
       // Per fatture: calcola imponibile e totale con IVA
-      const imponibile = totaleRighe + totaliCosti;
-      const totale = imponibile + (imponibile * formData.iva / 100);
-      setFormData(prev => ({
-        ...prev,
-        imponibile,
-        totale
-      }));
+    const imponibile = totaleRighe + totaliCosti;
+    const totale = imponibile + (imponibile * formData.iva / 100);
+    setFormData(prev => ({
+      ...prev,
+      imponibile,
+      totale
+    }));
     }
   };
 
@@ -1147,10 +1147,10 @@ export default function InserimentoFattureMultiRiga({
         prezzi_vendita: nuoviPrezziVendita
       }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        prezzi_vendita: nuoviPrezziVendita
-      }));
+    setFormData(prev => ({
+      ...prev,
+      prezzi_vendita: nuoviPrezziVendita
+    }));
     }
   };
 
@@ -1168,20 +1168,20 @@ export default function InserimentoFattureMultiRiga({
         return newData;
       });
     } else {
-      setFormData(prev => {
-        const newFormData = { ...prev, [campo]: valore };
-        
-        // Ricalcola immediatamente i totali
-        const totaleRighe = newFormData.righe.reduce((acc, riga) => acc + (riga.quantita * riga.prezzo_acquisto_per_stelo), 0);
-        const totaliCosti = newFormData.costo_trasporto + newFormData.costo_commissioni + newFormData.costo_imballaggi;
-        const imponibile = totaleRighe + totaliCosti;
-        const totale = imponibile + (imponibile * newFormData.iva / 100);
-        
-        newFormData.imponibile = imponibile;
-        newFormData.totale = totale;
-        
-        return newFormData;
-      });
+    setFormData(prev => {
+      const newFormData = { ...prev, [campo]: valore };
+      
+      // Ricalcola immediatamente i totali
+      const totaleRighe = newFormData.righe.reduce((acc, riga) => acc + (riga.quantita * riga.prezzo_acquisto_per_stelo), 0);
+      const totaliCosti = newFormData.costo_trasporto + newFormData.costo_commissioni + newFormData.costo_imballaggi;
+      const imponibile = totaleRighe + totaliCosti;
+      const totale = imponibile + (imponibile * newFormData.iva / 100);
+      
+      newFormData.imponibile = imponibile;
+      newFormData.totale = totale;
+      
+      return newFormData;
+    });
     }
     
     // Ricalcola prezzi di vendita con il nuovo spalmo
@@ -1231,11 +1231,11 @@ export default function InserimentoFattureMultiRiga({
         prezzi_vendita: [...prev.prezzi_vendita, nuovoPrezzoVendita]
       }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        righe: [...prev.righe, nuovaRiga],
-        prezzi_vendita: [...prev.prezzi_vendita, nuovoPrezzoVendita]
-      }));
+    setFormData(prev => ({
+      ...prev,
+      righe: [...prev.righe, nuovaRiga],
+      prezzi_vendita: [...prev.prezzi_vendita, nuovoPrezzoVendita]
+    }));
     }
   };
 
@@ -1282,11 +1282,11 @@ export default function InserimentoFattureMultiRiga({
           prezzi_vendita: prev.prezzi_vendita.filter((_, i) => i !== index)
         }));
       } else {
-        setFormData(prev => ({
-          ...prev,
-          righe: prev.righe.filter((_, i) => i !== index),
-          prezzi_vendita: prev.prezzi_vendita.filter((_, i) => i !== index)
-        }));
+      setFormData(prev => ({
+        ...prev,
+        righe: prev.righe.filter((_, i) => i !== index),
+        prezzi_vendita: prev.prezzi_vendita.filter((_, i) => i !== index)
+      }));
       }
     }
   };
@@ -1353,35 +1353,35 @@ export default function InserimentoFattureMultiRiga({
         return newData;
       });
     } else {
-      setFormData(prev => {
-        const newFormData = {
-          ...prev,
-          righe: prev.righe.map((riga, i) => {
-            if (i === index) {
-              const updatedRiga = { ...riga, [field]: value };
-              // Calcola automaticamente il totale_riga quando cambiano quantità o prezzo
-              if (field === 'quantita' || field === 'prezzo_acquisto_per_stelo') {
-                updatedRiga.totale_riga = updatedRiga.quantita * updatedRiga.prezzo_acquisto_per_stelo;
-              }
-              return updatedRiga;
+    setFormData(prev => {
+      const newFormData = {
+        ...prev,
+        righe: prev.righe.map((riga, i) => {
+          if (i === index) {
+            const updatedRiga = { ...riga, [field]: value };
+            // Calcola automaticamente il totale_riga quando cambiano quantità o prezzo
+            if (field === 'quantita' || field === 'prezzo_acquisto_per_stelo') {
+              updatedRiga.totale_riga = updatedRiga.quantita * updatedRiga.prezzo_acquisto_per_stelo;
             }
-            return riga;
-          })
-        };
+            return updatedRiga;
+          }
+          return riga;
+        })
+      };
+      
+      // Ricalcola immediatamente tutti i totali quando cambiano le righe
+      if (field === 'quantita' || field === 'prezzo_acquisto_per_stelo') {
+        const totaleRighe = newFormData.righe.reduce((acc, riga) => acc + (riga.quantita * riga.prezzo_acquisto_per_stelo), 0);
+        const totaliCosti = newFormData.costo_trasporto + newFormData.costo_commissioni + newFormData.costo_imballaggi;
+        const imponibile = totaleRighe + totaliCosti;
+        const totale = imponibile + (imponibile * newFormData.iva / 100);
         
-        // Ricalcola immediatamente tutti i totali quando cambiano le righe
-        if (field === 'quantita' || field === 'prezzo_acquisto_per_stelo') {
-          const totaleRighe = newFormData.righe.reduce((acc, riga) => acc + (riga.quantita * riga.prezzo_acquisto_per_stelo), 0);
-          const totaliCosti = newFormData.costo_trasporto + newFormData.costo_commissioni + newFormData.costo_imballaggi;
-          const imponibile = totaleRighe + totaliCosti;
-          const totale = imponibile + (imponibile * newFormData.iva / 100);
-          
-          newFormData.imponibile = imponibile;
-          newFormData.totale = totale;
-        }
-        
-        return newFormData;
-      });
+        newFormData.imponibile = imponibile;
+        newFormData.totale = totale;
+      }
+      
+      return newFormData;
+    });
     }
     
     // Ricalcola prezzi di vendita se necessario
@@ -1451,7 +1451,7 @@ export default function InserimentoFattureMultiRiga({
       });
     } else {
       // Reset per nuova fattura
-      setFormData({
+    setFormData({
       numero_fattura: '',
       data: new Date().toISOString().split('T')[0],
       id_fornitore: 0,
@@ -1492,7 +1492,7 @@ export default function InserimentoFattureMultiRiga({
           prezzo_vendita_3: 0
         }
       ]
-      });
+    });
     }
     setOpenDialog(true);
   };
@@ -1696,59 +1696,59 @@ export default function InserimentoFattureMultiRiga({
         
       } else {
         // **VALIDAZIONE FATTURE (ORIGINALE)**
-        
-        // Controllo fornitore
-        if (!formData.id_fornitore || formData.id_fornitore === 0) {
-          erroriValidazione.push('Seleziona un fornitore');
-        }
 
-        // Controllo numero fattura
-        if (!formData.numero_fattura || formData.numero_fattura.trim() === '') {
-          erroriValidazione.push('Inserisci il numero fattura');
-        }
+      // Controllo fornitore
+      if (!formData.id_fornitore || formData.id_fornitore === 0) {
+        erroriValidazione.push('Seleziona un fornitore');
+      }
 
-        // Controllo data
-        if (!formData.data) {
-          erroriValidazione.push('Inserisci la data fattura');
-        }
+      // Controllo numero fattura
+      if (!formData.numero_fattura || formData.numero_fattura.trim() === '') {
+        erroriValidazione.push('Inserisci il numero fattura');
+      }
+
+      // Controllo data
+      if (!formData.data) {
+        erroriValidazione.push('Inserisci la data fattura');
+      }
 
         // Controllo righe fatture
-        if (!formData.righe || formData.righe.length === 0) {
-          erroriValidazione.push('Aggiungi almeno una riga articolo');
-        } else {
+      if (!formData.righe || formData.righe.length === 0) {
+        erroriValidazione.push('Aggiungi almeno una riga articolo');
+      } else {
           // Controllo ogni riga fattura
-          formData.righe.forEach((riga, index) => {
-            if (!riga.id_gruppo || riga.id_gruppo === 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Seleziona un gruppo`);
-            }
-            if (!riga.nome_prodotto || riga.nome_prodotto.trim() === '') {
-              erroriValidazione.push(`Riga ${index + 1}: Inserisci il nome prodotto`);
-            }
-            if (!riga.id_colore || riga.id_colore === 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Seleziona un colore`);
-            }
-            if (!riga.id_provenienza || riga.id_provenienza === 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Seleziona una provenienza`);
-            }
-            if (!riga.id_foto || riga.id_foto === 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Seleziona una foto`);
-            }
-            if (!riga.id_imballo || riga.id_imballo === 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Seleziona un imballo`);
-            }
-            if (!riga.id_altezza || riga.id_altezza === 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Seleziona un'altezza`);
-            }
-            if (!riga.id_qualita || riga.id_qualita === 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Seleziona una qualità`);
-            }
-            if (!riga.quantita || riga.quantita <= 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Inserisci una quantità valida`);
-            }
-            if (!riga.prezzo_acquisto_per_stelo || riga.prezzo_acquisto_per_stelo <= 0) {
-              erroriValidazione.push(`Riga ${index + 1}: Inserisci un prezzo di acquisto valido`);
-            }
-          });
+        formData.righe.forEach((riga, index) => {
+          if (!riga.id_gruppo || riga.id_gruppo === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un gruppo`);
+          }
+          if (!riga.nome_prodotto || riga.nome_prodotto.trim() === '') {
+            erroriValidazione.push(`Riga ${index + 1}: Inserisci il nome prodotto`);
+          }
+          if (!riga.id_colore || riga.id_colore === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un colore`);
+          }
+          if (!riga.id_provenienza || riga.id_provenienza === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona una provenienza`);
+          }
+          if (!riga.id_foto || riga.id_foto === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona una foto`);
+          }
+          if (!riga.id_imballo || riga.id_imballo === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un imballo`);
+          }
+          if (!riga.id_altezza || riga.id_altezza === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona un'altezza`);
+          }
+          if (!riga.id_qualita || riga.id_qualita === 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Seleziona una qualità`);
+          }
+          if (!riga.quantita || riga.quantita <= 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Inserisci una quantità valida`);
+          }
+          if (!riga.prezzo_acquisto_per_stelo || riga.prezzo_acquisto_per_stelo <= 0) {
+            erroriValidazione.push(`Riga ${index + 1}: Inserisci un prezzo di acquisto valido`);
+          }
+        });
         }
       }
 
@@ -2171,6 +2171,16 @@ export default function InserimentoFattureMultiRiga({
           prezzo_vendita_3: primoPrezzoVendita.prezzo_vendita_3
         };
         
+        // Validazione: blocca creazione se la quantità del carico è assente o <= 0
+        if (!datiCompleti.quantita || Number(datiCompleti.quantita) <= 0) {
+          setSnackbar({
+            open: true,
+            message: 'Quantità carico non valida (deve essere > 0)',
+            severity: 'error'
+          });
+          return;
+        }
+        
         result = await apiService.createFatturaConDocumento(datiCompleti);
         setSnackbar({
           open: true,
@@ -2362,72 +2372,72 @@ export default function InserimentoFattureMultiRiga({
     } else {
       // **FORM FATTURE (ORIGINALE)**
       return (
-        <Grid container spacing={4}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="📋 Numero Fattura"
-              value={formData.numero_fattura}
-              onChange={(e) => setFormData({...formData, numero_fattura: e.target.value})}
-              sx={modernStyles.modernInput}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="📅 Data"
-              type="date"
-              value={formData.data}
-              onChange={(e) => setFormData({...formData, data: e.target.value})}
-              InputLabelProps={{ shrink: true }}
-              sx={modernStyles.modernInput}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth sx={modernStyles.modernInput}>
-              <InputLabel>🏢 Fornitore</InputLabel>
-              <Select
-                value={formData.id_fornitore || ""}
-                onChange={(e) => setFormData({...formData, id_fornitore: Number(e.target.value)})}
-              >
-                <MenuItem value="">
-                  <em>Seleziona fornitore...</em>
-                </MenuItem>
-                {fornitori.map((fornitore) => (
-                  <MenuItem key={fornitore.id} value={fornitore.id}>
-                    {fornitore.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth sx={modernStyles.modernInput}>
-              <InputLabel>📊 Stato</InputLabel>
-              <Select
-                value={formData.stato}
-                onChange={(e) => setFormData({...formData, stato: e.target.value})}
-              >
-                <MenuItem value="bozza">📝 Bozza</MenuItem>
-                <MenuItem value="confermata">✅ Confermata</MenuItem>
-                <MenuItem value="pagata">💰 Pagata</MenuItem>
-                <MenuItem value="annullata">❌ Annullata</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="📝 Note"
-              multiline
-              rows={4}
-              value={formData.note}
-              onChange={(e) => setFormData({...formData, note: e.target.value})}
-              sx={modernStyles.modernInput}
-            />
-          </Grid>
-        </Grid>
-      );
+    <Grid container spacing={4}>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="📋 Numero Fattura"
+          value={formData.numero_fattura}
+          onChange={(e) => setFormData({...formData, numero_fattura: e.target.value})}
+          sx={modernStyles.modernInput}
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <TextField
+          fullWidth
+          label="📅 Data"
+          type="date"
+          value={formData.data}
+          onChange={(e) => setFormData({...formData, data: e.target.value})}
+          InputLabelProps={{ shrink: true }}
+          sx={modernStyles.modernInput}
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <FormControl fullWidth sx={modernStyles.modernInput}>
+          <InputLabel>🏢 Fornitore</InputLabel>
+          <Select
+            value={formData.id_fornitore || ""}
+            onChange={(e) => setFormData({...formData, id_fornitore: Number(e.target.value)})}
+          >
+            <MenuItem value="">
+              <em>Seleziona fornitore...</em>
+            </MenuItem>
+            {fornitori.map((fornitore) => (
+              <MenuItem key={fornitore.id} value={fornitore.id}>
+                {fornitore.nome}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <FormControl fullWidth sx={modernStyles.modernInput}>
+          <InputLabel>📊 Stato</InputLabel>
+          <Select
+            value={formData.stato}
+            onChange={(e) => setFormData({...formData, stato: e.target.value})}
+          >
+            <MenuItem value="bozza">📝 Bozza</MenuItem>
+            <MenuItem value="confermata">✅ Confermata</MenuItem>
+            <MenuItem value="pagata">💰 Pagata</MenuItem>
+            <MenuItem value="annullata">❌ Annullata</MenuItem>
+          </Select>
+        </FormControl>
+      </Grid>
+      <Grid item xs={12}>
+        <TextField
+          fullWidth
+          label="📝 Note"
+          multiline
+          rows={4}
+          value={formData.note}
+          onChange={(e) => setFormData({...formData, note: e.target.value})}
+          sx={modernStyles.modernInput}
+        />
+      </Grid>
+    </Grid>
+  );
     }
   };
 
@@ -2741,45 +2751,45 @@ export default function InserimentoFattureMultiRiga({
     const currentData = getCurrentData();
     
     return (
-      <Grid container spacing={3}>
-        {/* COSTO TRASPORTO */}
-        <Grid item xs={12}>
-          <Typography variant="h6" sx={{ mb: 2, color: modernStyles.colors.primary }}>
-            🚚 Trasporto
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Costo Trasporto (€)"
-                type="number"
+    <Grid container spacing={3}>
+      {/* COSTO TRASPORTO */}
+      <Grid item xs={12}>
+        <Typography variant="h6" sx={{ mb: 2, color: modernStyles.colors.primary }}>
+          🚚 Trasporto
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              label="Costo Trasporto (€)"
+              type="number"
                 value={currentData.costo_trasporto}
-                onChange={(e) => updateCosto('costo_trasporto', Number(e.target.value))}
-                inputProps={{ step: 0.01 }}
-                sx={{ 
+              onChange={(e) => updateCosto('costo_trasporto', Number(e.target.value))}
+              inputProps={{ step: 0.01 }}
+              sx={{ 
+                bgcolor: 'white',
+                '& .MuiOutlinedInput-root': {
+                  ...modernStyles.components.input
+                }
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <FormControl 
+              fullWidth 
+              sx={{ 
+                '& .MuiOutlinedInput-root': {
                   bgcolor: 'white',
-                  '& .MuiOutlinedInput-root': {
-                    ...modernStyles.components.input
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl 
-                fullWidth 
-                sx={{ 
-                  '& .MuiOutlinedInput-root': {
-                    bgcolor: 'white',
-                    ...modernStyles.components.input
-                  }
-                }}
-              >
-                <InputLabel>Fornitore Trasporto</InputLabel>
-                <Select
+                  ...modernStyles.components.input
+                }
+              }}
+            >
+              <InputLabel>Fornitore Trasporto</InputLabel>
+              <Select
                   value={currentData.id_fornitore_trasporto}
                   onChange={(e) => updateFornitoreAnalitici('id_fornitore_trasporto', Number(e.target.value))}
-                  label="Fornitore Trasporto"
-                >
+                label="Fornitore Trasporto"
+              >
                 <MenuItem value={0}>Nessun fornitore</MenuItem>
                 {fornitori.map((fornitore) => (
                   <MenuItem key={fornitore.id} value={fornitore.id}>
@@ -2949,7 +2959,7 @@ export default function InserimentoFattureMultiRiga({
         </Card>
       </Grid>
     </Grid>
-    );
+  );
   };
 
   const renderPrezziVendita = () => {
@@ -3151,23 +3161,23 @@ export default function InserimentoFattureMultiRiga({
     } else {
       // Modalità FATTURE - con IVA
       return (
-        <Box>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+    <Box>
+      <Grid container spacing={2}>
+        <Grid item xs={12} sm={4}>
               <Typography variant="h6">Imponibile: €{currentData.imponibile.toFixed(2)}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={4}>
+        </Grid>
+        <Grid item xs={12} sm={4}>
               <Typography variant="h6">IVA ({currentData.iva}%): €{(currentData.imponibile * currentData.iva / 100).toFixed(2)}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={4}>
+        </Grid>
+        <Grid item xs={12} sm={4}>
               <Typography variant="h6" sx={{ fontWeight: 'bold' }}>TOTALE: €{currentData.totale.toFixed(2)}</Typography>
-            </Grid>
-          </Grid>
+        </Grid>
+      </Grid>
         </Box>
       );
     }
   };
-
+      
   const renderRiepilogoTabella = () => (
     <Box>
       <Divider sx={{ my: 2 }} />
@@ -3560,26 +3570,26 @@ export default function InserimentoFattureMultiRiga({
 
       {/* Sezione principale - nascosta quando soloOrdini è true */}
       {!soloOrdini && (
-        <Box sx={modernStyles.mainContainer}>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-          >
-            <Paper sx={modernStyles.glassmorphic}>
+      <Box sx={modernStyles.mainContainer}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
+          <Paper sx={modernStyles.glassmorphic}>
               <Box sx={{ p: 1.5 }}>
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
-                >
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <ReceiptLongIcon sx={{ fontSize: 24, color: modernStyles.colors.primary, mr: 1.5 }} />
                       <Box>
-                        <Typography 
+                  <Typography 
                           variant="h6" 
-                          sx={{ 
+                    sx={{ 
                             fontWeight: 600, 
                             color: modernStyles.colors.text,
                             fontSize: '1.2rem',
@@ -3598,13 +3608,13 @@ export default function InserimentoFattureMultiRiga({
                             ? 'Gestione ordini virtuali che diventano fatture reali alla consegna'
                             : 'Gestione completa delle fatture di acquisto con 8 caratteristiche per articolo'
                           }
-                        </Typography>
-                      </Box>
+                  </Typography>
+                </Box>
                     </Box>
-                  
+              
                   {/* 🔥 TOGGLE MODALITÀ CON INDICATORI VISIVI */}
                   {!soloOrdini && (
-                    <motion.div
+              <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
@@ -3615,7 +3625,7 @@ export default function InserimentoFattureMultiRiga({
                         <Box sx={{ fontSize: '16px' }}>🛒</Box> : 
                         <Box sx={{ fontSize: '16px' }}>📋</Box>
                       }
-                      sx={{
+                  sx={{ 
                         borderRadius: '25px',
                         padding: '10px 20px',
                         background: modalitaOrdini ? 
@@ -3654,22 +3664,22 @@ export default function InserimentoFattureMultiRiga({
               </motion.div>
 
               {!soloOrdini && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
                   style={{ marginTop: '8px' }}
-                >
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={handleOpenDialog}
-                    sx={modernStyles.primaryButton}
+              >
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={handleOpenDialog}
+                  sx={modernStyles.primaryButton}
                     size="medium"
-                  >
+                >
                     {modalitaOrdini ? 'Crea Nuovo Ordine' : 'Crea Nuova Fattura'}
-                  </Button>
-                </motion.div>
+                </Button>
+              </motion.div>
               )}
             </Box>
           </Paper>
@@ -3677,14 +3687,14 @@ export default function InserimentoFattureMultiRiga({
         </Box>
       )}
 
-      {/* NUOVO: Lista fatture esistenti */}
+        {/* NUOVO: Lista fatture esistenti */}
       {!soloOrdini && (
         <Box sx={{ mt: 1 }}>
-          {renderListaFatture()}
+        {renderListaFatture()}
         </Box>
       )}
 
-      <Dialog 
+        <Dialog 
           open={open || openDialog} 
           onClose={() => {
             handleCloseDialog();
@@ -3722,7 +3732,7 @@ export default function InserimentoFattureMultiRiga({
               {modalitaOrdini ? (
                 <ShoppingCartIcon sx={{ mr: 2, fontSize: 28 }} />
               ) : (
-                <ReceiptIcon sx={{ mr: 2, fontSize: 28 }} />
+              <ReceiptIcon sx={{ mr: 2, fontSize: 28 }} />
               )}
               <Typography component="span" variant="h5" sx={{ fontWeight: 700 }}>
                 {modalitaOrdini 

@@ -29,6 +29,8 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import RemoveCircleOutlineIcon from '@mui/icons-material/RemoveCircleOutline';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { apiService, type Cliente } from '../../lib/apiService';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useNavigate } from 'react-router-dom';
 import { safeBack } from '../../lib/navigation';
 
@@ -44,7 +46,7 @@ type RigaUI = {
   imballoQuant?: number;
 };
 
-export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; existing?: { id: number; ddt?: any; righe?: any[] } }) {
+export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; existing?: { id: number; ddt?: any; righe?: any[]; fattura?: any } }) {
   const navigate = useNavigate();
   const [active, setActive] = React.useState(0);
   const [clienti, setClienti] = React.useState<Cliente[]>([]);
@@ -63,6 +65,12 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
   const [error, setError] = React.useState<string | null>(null);
   const summaryRef = React.useRef<HTMLDivElement>(null);
   const [quickEdit, setQuickEdit] = React.useState<boolean>(true);
+  const [savedId, setSavedId] = React.useState<number | undefined>(existing?.id);
+
+  React.useEffect(() => {
+    // Rende disponibile html2canvas a jsPDF.html
+    (window as any).html2canvas = html2canvas;
+  }, []);
 
   const accent = '#7c3aed';
   const fieldSx = {
@@ -93,6 +101,85 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
       setNote(d.note || '');
     }
   }, [mode, existing]);
+
+  // Prefill in modalità modifica Fattura
+  React.useEffect(()=>{
+    if (mode !== 'fattura' || !existing?.fattura) return;
+    const f = existing.fattura;
+    setData(f.data_fattura || new Date().toISOString().slice(0,10));
+    setNote(f.note || '');
+  }, [mode, existing]);
+
+  // Quando ho clienti caricati, imposto il cliente della FATTURA esistente
+  React.useEffect(()=>{
+    if (mode !== 'fattura' || !existing?.fattura) return;
+    const found = clienti.find(c => c.id === existing.fattura.cliente_id) || null;
+    if (found) setCliente(found);
+  }, [clienti, existing, mode]);
+
+  // Righe precompilate per FATTURA quando ho giacenze caricate
+  React.useEffect(()=>{
+    if (mode !== 'fattura' || !existing?.righe) return;
+    (async () => {
+      // Crea fallback articolo anche se non più in giacenza (>0)
+      let gMap = new Map<number,string>();
+      let pMap = new Map<number,string>();
+      let cMap = new Map<number,string>();
+      let aMap = new Map<number, any>();
+      let iName = new Map<number,string>();
+      let iQty = new Map<number, number>();
+      try {
+        const [gruppi, prodotti, colori, altezze, imballi] = await Promise.all([
+          apiService.getGruppi(),
+          apiService.getProdotti(),
+          apiService.getColori(),
+          apiService.getAltezze(),
+          apiService.getImballaggi()
+        ]);
+        gMap = new Map(gruppi.map((x:any)=>[x.id, x.nome]));
+        pMap = new Map(prodotti.map((x:any)=>[x.id, x.nome]));
+        cMap = new Map(colori.map((x:any)=>[x.id, x.nome]));
+        aMap = new Map(altezze.map((x:any)=>[x.id, x.altezza_cm]));
+        iName = new Map(imballi.map((x:any)=>[x.id, x.nome]));
+        iQty = new Map(imballi.map((x:any)=>[x.id, x.quantita || x.qta || 1]));
+      } catch {}
+
+      const rows = (existing.righe || []).map((r: any) => {
+        let match = giacenze.find((g: any) => g.articolo_id === r.articolo_id) || null;
+        if (!match) {
+          // Fallback sintetico per visualizzazione/modifica
+          match = {
+            articolo_id: r.articolo_id,
+            gruppo_id: r.gruppo_id,
+            prodotto_id: r.prodotto_id,
+            colore_id: r.colore_id,
+            imballo_id: r.imballo_id,
+            altezza_id: r.altezza_id,
+            qualita_id: r.qualita_id,
+            gruppo_nome: gMap.get(r.gruppo_id) || '',
+            prodotto_nome: pMap.get(r.prodotto_id) || '',
+            colore_nome: cMap.get(r.colore_id) || '',
+            imballo_nome: iName.get(r.imballo_id) || '',
+            altezza_cm: aMap.get(r.altezza_id) || '',
+            imballo_quantita: iQty.get(r.imballo_id) || 1,
+            quantita_giacenza: 0
+          } as any;
+        }
+        const imballo = Number(match?.imballo_quantita || 1);
+        const prezzoBase = (typeof r.prezzo_unitario === 'number' ? r.prezzo_unitario : (typeof r.prezzo_finale === 'number' ? r.prezzo_finale : 0));
+        return {
+          giacenza: match,
+          quantita: String(r.quantita || imballo),
+          livello: 'L1' as const,
+          prezzo: String(prezzoBase || 0),
+          sconto: String(r.sconto_percentuale ?? 0),
+          iva: String(r.iva_percentuale ?? 10),
+          imballoQuant: imballo
+        } as RigaUI;
+      });
+      if (rows.length) setRighe(rows);
+    })();
+  }, [giacenze, existing, mode]);
 
   // Quando ho clienti caricati, imposto il cliente del DDT esistente
   React.useEffect(()=>{
@@ -150,7 +237,9 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
     if (!r.giacenza) return true;
     const q = Number(r.quantita || 0);
     const imballo = Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1);
-    return q <= 0 || q % imballo !== 0;
+    const available = Number(r.giacenza?.quantita_giacenza || 0);
+    const exceeds = q > available;
+    return q <= 0 || q % imballo !== 0 || exceeds;
   };
   const validRows = React.useMemo(() => righe.filter(r => !!r.giacenza && Number(r.quantita || 0) > 0), [righe]);
   const canProceed = !!cliente && validRows.length > 0 && validRows.every(r => !isImballoInvalid(r));
@@ -158,15 +247,13 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
   const imponibile = validRows.reduce((s, r) => {
     const q = Number(r.quantita||0);
     const p = Number(r.prezzo||0);
-    const sc = Number(r.sconto||0);
-    return s + (q * p * (1 - sc/100));
+    return s + (q * p);
   }, 0);
   const totaleIva = validRows.reduce((s, r) => {
     const q = Number(r.quantita||0);
     const p = Number(r.prezzo||0);
-    const sc = Number(r.sconto||0);
     const ivaPerc = Number(r.iva||0);
-    const base = q * p * (1 - sc/100);
+    const base = q * p;
     return s + base * (ivaPerc/100);
   }, 0);
   const totale = imponibile + (mode==='fattura' ? totaleIva : 0);
@@ -179,7 +266,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
     validRows.forEach(r => {
       const q = Number(r.quantita||0);
       const costUnit = Number(r.giacenza?.prezzo_costo_finale_per_stelo || r.giacenza?.prezzo_acquisto_per_stelo || 0);
-      const priceUnit = Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100);
+      const priceUnit = Number(r.prezzo||0);
       if (q > 0 && costUnit > 0) {
         qtyTot += q;
         markupWeightedSum += ((priceUnit - costUnit) / costUnit) * 100 * q;
@@ -195,13 +282,372 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
     window.print();
   };
 
+  const buildDDTHtmlById = async (ddtId: number): Promise<{ html: string; fileName: string }> => {
+    try {
+      const [{ ddt, righe }, gruppi, prodotti, colori, altezze, imballi] = await Promise.all([
+        apiService.getDDTVenditaById(ddtId),
+        apiService.getGruppi(),
+        apiService.getProdotti(),
+        apiService.getColori(),
+        apiService.getAltezze(),
+        apiService.getImballaggi()
+      ]);
+      const gMap = new Map(gruppi.map((x:any)=>[x.id, x.nome]));
+      const pMap = new Map(prodotti.map((x:any)=>[x.id, x.nome]));
+      const cMap = new Map(colori.map((x:any)=>[x.id, x.nome]));
+      const aMap = new Map(altezze.map((x:any)=>[x.id, x.altezza_cm]));
+      const iMap = new Map(imballi.map((x:any)=>[x.id, x.nome]));
+      const clienteDett = clienti.find(c => c.id === ddt.cliente_id) || null;
+      const rows = (righe || []).map((r: any) => {
+        const gruppo = gMap.get(r.gruppo_id) || '';
+        const prodotto = pMap.get(r.prodotto_id) || '';
+        const colore = cMap.get(r.colore_id) || '';
+        const altezza = aMap.get(r.altezza_id) || '';
+        const imballo = iMap.get(r.imballo_id) || '';
+        const titolo = `${String(gruppo).toUpperCase()} - ${String(prodotto).toUpperCase()}`;
+        const sotto = `${colore} • ${altezza}${altezza ? 'cm' : ''} • ${imballo}`;
+        const prezzo = (r.prezzo_unitario ?? r.prezzo_finale ?? 0);
+        const imponibileRiga = (Number(r.quantita||0) * Number(prezzo||0));
+        return `<tr>
+          <td><div style="font-weight:700">${titolo}</div><div style=\"color:#64748b;font-size:12px\">${sotto}</div></td>
+          <td style=\"text-align:right\">${r.quantita}</td>
+          <td style=\"text-align:right\">€ ${Number(prezzo||0).toFixed(3)}</td>
+          <td style=\"text-align:right\">€ ${imponibileRiga.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+      const totImponibile = (righe||[]).reduce((s:any, r:any)=> s + Number(r.quantita||0)*Number(r.prezzo_unitario ?? r.prezzo_finale ?? 0), 0);
+      const html = `
+        <div data-doc-root>
+        <style>
+          *{box-sizing:border-box}
+          body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; padding:28px; color:#0f172a}
+          h1{margin:0 0 2px}
+          .muted{color:#64748b}
+          .header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #f59e0b; padding-bottom:8px; margin-bottom:12px}
+          .badge{background:#f59e0b; color:white; padding:4px 8px; font-weight:700; letter-spacing:.5px}
+          table{width:100%;border-collapse:collapse;margin-top:12px}
+          th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top}
+          thead th{background:#fff7ed}
+          .totali{margin-top:12px; display:flex; gap:16px; justify-content:flex-end}
+          .tot-card{border:1px solid #e5e7eb; padding:10px 12px; min-width:220px}
+          .label{color:#64748b; font-size:12px}
+        </style>
+        <div class="header">
+          <div>
+            <div class="badge">DOCUMENTO DI TRASPORTO</div>
+            <h1>DDT ${ddt.numero_ddt || ddt.id}</h1>
+            <div class="muted">Data: ${ddt.data_ddt}</div>
+          </div>
+          <div>
+            <div style="font-weight:700">${ddt.cliente_nome || clienteDett?.nome || ddt.cliente_id || ''}</div>
+            <div class="muted">${clienteDett?.ragione_sociale || ''}</div>
+            <div class="muted">${[clienteDett?.indirizzo, clienteDett?.cap, clienteDett?.citta, clienteDett?.provincia].filter(Boolean).join(' ')}</div>
+            <div class="muted">P.IVA: ${clienteDett?.partita_iva || '-'} • CF: ${clienteDett?.codice_fiscale || '-'}</div>
+            <div class="muted">Destinazione: ${ddt.destinazione || '-'}</div>
+            <div class="muted">Spedizioniere: ${ddt.spedizioniere || '-'}</div>
+            ${ddt.note ? `<div class="muted">Note: ${ddt.note}</div>` : ''}
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Articolo</th><th style=\"text-align:right\">Qta</th><th style=\"text-align:right\">Prezzo</th><th style=\"text-align:right\">Imponibile</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="totali">
+          <div class="tot-card"><div class="label">Totale Imponibile</div><div style="font-weight:800">€ ${totImponibile.toFixed(2)}</div></div>
+        </div>
+        </div>`;
+      return { html, fileName: `DDT-${ddt.numero_ddt || ddt.id}.pdf` };
+    } catch { return { html: '<div />', fileName: 'DDT.pdf' }; }
+  };
+
+  const stampaDDTById = async (ddtId: number) => {
+    const built = await buildDDTHtmlById(ddtId);
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<!doctype html><html><head><title>${built.fileName.replace(/\.pdf$/, '')}</title></head><body>${built.html}<script>window.onload=()=>window.print()</script></body></html>`);
+    w.document.close();
+  };
+
+  const buildFatturaHtmlById = async (fatturaId: number): Promise<{ html: string; fileName: string }> => {
+    try {
+      const [{ fattura: f, righe }, gruppi, prodotti, colori, altezze, imballi] = await Promise.all([
+        apiService.getFatturaVenditaById(fatturaId),
+        apiService.getGruppi(),
+        apiService.getProdotti(),
+        apiService.getColori(),
+        apiService.getAltezze(),
+        apiService.getImballaggi()
+      ]);
+      const gMap = new Map(gruppi.map((x:any)=>[x.id, x.nome]));
+      const pMap = new Map(prodotti.map((x:any)=>[x.id, x.nome]));
+      const cMap = new Map(colori.map((x:any)=>[x.id, x.nome]));
+      const aMap = new Map(altezze.map((x:any)=>[x.id, x.altezza_cm]));
+      const iMap = new Map(imballi.map((x:any)=>[x.id, x.nome]));
+      const clienteDett = clienti.find(c => c.id === f.cliente_id) || null;
+      const rows = (righe || []).map((r: any) => {
+        const gruppo = gMap.get(r.gruppo_id) || '';
+        const prodotto = pMap.get(r.prodotto_id) || '';
+        const colore = cMap.get(r.colore_id) || '';
+        const altezza = aMap.get(r.altezza_id) || '';
+        const imballo = iMap.get(r.imballo_id) || '';
+        const titolo = `${String(gruppo).toUpperCase()} - ${String(prodotto).toUpperCase()}`;
+        const sotto = `${colore} • ${altezza}${altezza ? 'cm' : ''} • ${imballo}`;
+      const pu = Number(r.prezzo_unitario||0);
+        const imponibileRiga = Number(r.quantita||0) * pu;
+        const ivaRiga = Number(r.iva_percentuale||0) * imponibileRiga / 100;
+        const totaleRiga = imponibileRiga + ivaRiga;
+        return `<tr>
+          <td><div style=\"font-weight:700\">${titolo}</div><div style=\"color:#64748b;font-size:12px\">${sotto}</div></td>
+          <td style=\"text-align:right\">${r.quantita}</td>
+          <td style=\"text-align:right\">€ ${pu.toFixed(3)}</td>
+          
+          <td style=\"text-align:right\">${r.iva_percentuale||0}%</td>
+          <td style=\"text-align:right\">€ ${imponibileRiga.toFixed(2)}</td>
+          <td style=\"text-align:right\">€ ${ivaRiga.toFixed(2)}</td>
+          <td style=\"text-align:right\">€ ${totaleRiga.toFixed(2)}</td>
+        </tr>`;
+      }).join('');
+      const totImponibile = (righe||[]).reduce((s:any, r:any)=> s + Number(r.quantita||0)* Number(r.prezzo_unitario||0), 0);
+      const totIva = (righe||[]).reduce((s:any, r:any)=> {
+        const base = Number(r.quantita||0)* Number(r.prezzo_unitario||0);
+        return s + base * (Number(r.iva_percentuale||0)/100);
+      }, 0);
+      const tot = totImponibile + totIva;
+      const html = `
+        <div data-doc-root>
+        <style>
+          *{box-sizing:border-box}
+          body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; padding:28px; color:#0f172a}
+          h1{margin:0 0 2px}
+          .muted{color:#64748b}
+          .header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #f59e0b; padding-bottom:8px; margin-bottom:12px}
+          .badge{background:#f59e0b; color:white; padding:4px 8px; font-weight:700; letter-spacing:.5px}
+          table{width:100%;border-collapse:collapse;margin-top:12px}
+          th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top}
+          thead th{background:#fff7ed}
+          .totali{margin-top:12px; display:flex; gap:16px; justify-content:flex-end}
+          .tot-card{border:1px solid #e5e7eb; padding:10px 12px; min-width:220px}
+          .label{color:#64748b; font-size:12px}
+        </style>
+        <div class="header">
+          <div>
+            <div class="badge">FATTURA</div>
+            <h1>${f.numero_fattura || f.id}</h1>
+            <div class="muted">Data: ${f.data_fattura}</div>
+          </div>
+          <div>
+            <div style="font-weight:700">${f.cliente_nome || clienteDett?.nome || f.cliente_id || ''}</div>
+            <div class="muted">${clienteDett?.ragione_sociale || ''}</div>
+            <div class="muted">${[clienteDett?.indirizzo, clienteDett?.cap, clienteDett?.citta, clienteDett?.provincia].filter(Boolean).join(' ')}</div>
+            <div class="muted">P.IVA: ${clienteDett?.partita_iva || '-'} • CF: ${clienteDett?.codice_fiscale || '-'}</div>
+            <div class="muted">Stato: ${f.stato}</div>
+            ${f.note ? `<div class="muted">Note: ${f.note}</div>` : ''}
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Articolo</th><th style=\"text-align:right\">Qta</th><th style=\"text-align:right\">Prezzo</th><th style=\"text-align:right\">IVA %</th><th style=\"text-align:right\">Imponibile</th><th style=\"text-align:right\">IVA</th><th style=\"text-align:right\">Totale</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="totali">
+          <div class="tot-card"><div class="label">Imponibile</div><div style="font-weight:800">€ ${totImponibile.toFixed(2)}</div></div>
+          <div class="tot-card"><div class="label">IVA</div><div style="font-weight:800">€ ${totIva.toFixed(2)}</div></div>
+          <div class="tot-card"><div class="label">Totale</div><div style="font-weight:800">€ ${tot.toFixed(2)}</div></div>
+        </div>
+        </div>`;
+      return { html, fileName: `FATTURA-${f.numero_fattura || f.id}.pdf` };
+    } catch { return { html: '<div />', fileName: 'FATTURA.pdf' }; }
+  };
+
+  const stampaFatturaById = async (fatturaId: number) => {
+    const built = await buildFatturaHtmlById(fatturaId);
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<!doctype html><html><head><title>${built.fileName.replace(/\.pdf$/, '')}</title></head><body>${built.html}<script>window.onload=()=>window.print()</script></body></html>`);
+    w.document.close();
+  };
+
+  const htmlToPdfBlob = async (html: string): Promise<Blob> => {
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '-10000px';
+    container.style.top = '0';
+    container.style.width = '794px'; /* ~A4 @96dpi */
+    container.style.background = '#ffffff';
+    container.style.padding = '28px';
+    container.innerHTML = html;
+    document.body.appendChild(container);
+    try {
+      const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = canvas.height * (imgWidth / canvas.width);
+
+      let y = 0;
+      pdf.addImage(imgData, 'JPEG', 0, y, imgWidth, imgHeight);
+      // Aggiungi pagine extra se serve (cropping tramite y negativo)
+      let remaining = imgHeight - pageHeight;
+      while (remaining > 0) {
+        pdf.addPage();
+        y = - (imgHeight - remaining);
+        pdf.addImage(imgData, 'JPEG', 0, y, imgWidth, imgHeight);
+        remaining -= pageHeight;
+      }
+      return pdf.output('blob');
+    } finally {
+      document.body.removeChild(container);
+    }
+  };
+
+  const saveOrUpdateAndReturnId = async (): Promise<number | undefined> => {
+    if (!cliente) { setError('Seleziona un cliente'); return; }
+    if (validRows.length === 0) { setError('Aggiungi almeno una riga valida'); return; }
+    try {
+      setSaving(true); setError(null);
+      if (mode === 'ddt') {
+        const payload = validRows.map(r => ({
+          quantita: Number(r.quantita||0),
+          prezzo_unitario: Number(r.prezzo||0),
+          prezzo_finale: Number(r.prezzo||0),
+          iva_percentuale: Number(r.iva||0),
+          documento_carico_id: r.giacenza?.carico_id ?? null,
+          articolo_id: r.giacenza?.articolo_id ?? null,
+          gruppo_id: r.giacenza?.gruppo_id ?? null,
+          prodotto_id: r.giacenza?.prodotto_id ?? null,
+          colore_id: r.giacenza?.colore_id ?? null,
+          imballo_id: r.giacenza?.imballo_id ?? null,
+          altezza_id: r.giacenza?.altezza_id ?? null,
+          qualita_id: r.giacenza?.qualita_id ?? null,
+        }));
+        if (existing?.id) {
+          await apiService.updateDDTVendita(existing.id, {
+            cliente_id: cliente.id,
+            data_ddt: data,
+            destinazione: destinazione || null,
+            spedizioniere: spedizioniere || null,
+            note: note ? `${note} | Scadenza: ${dataScadenza}` : `Scadenza: ${dataScadenza}`
+          } as any);
+          await apiService.replaceDDTRighe(existing.id, payload as any);
+          setSavedId(existing.id);
+          return existing.id;
+        } else {
+          const newId = await apiService.createDDTVendita({
+            cliente_id: cliente.id,
+            data_ddt: data,
+            stato: 'da_fatturare',
+            destinazione: destinazione || null,
+            spedizioniere: spedizioniere || null,
+            note: note ? `${note} | Scadenza: ${dataScadenza}` : `Scadenza: ${dataScadenza}`
+          } as any, payload as any);
+          setSavedId(newId);
+          return newId;
+        }
+      } else {
+        const payload = validRows.map(r => ({
+          quantita: Number(r.quantita||0),
+          prezzo_unitario: Number(r.prezzo||0),
+          prezzo_finale: Number(r.prezzo||0),
+          iva_percentuale: Number(r.iva||0),
+          documento_carico_id: r.giacenza?.carico_id ?? null,
+          articolo_id: r.giacenza?.articolo_id ?? null,
+          gruppo_id: r.giacenza?.gruppo_id ?? null,
+          prodotto_id: r.giacenza?.prodotto_id ?? null,
+          colore_id: r.giacenza?.colore_id ?? null,
+          imballo_id: r.giacenza?.imballo_id ?? null,
+          altezza_id: r.giacenza?.altezza_id ?? null,
+          qualita_id: r.giacenza?.qualita_id ?? null,
+        }));
+        if (existing?.id && existing.fattura) {
+          await apiService.updateFatturaVendita(existing.id, {
+            cliente_id: cliente.id,
+            data_fattura: data,
+            stato: existing.fattura.stato || 'non_pagata',
+            imponibile,
+            iva: totaleIva,
+            totale,
+            note: metodoPagamento==='nessuno'
+              ? (note || '')
+              : (note ? `${note} | Metodo: ${metodoPagamento}` : `Metodo: ${metodoPagamento}`),
+          } as any);
+          await apiService.replaceFatturaRighe(existing.id, payload as any);
+          setSavedId(existing.id);
+          return existing.id;
+        } else {
+          const newId = await apiService.createFatturaVendita({
+            cliente_id: cliente.id,
+            data_fattura: data,
+            stato: 'non_pagata',
+            imponibile,
+            iva: totaleIva,
+            totale,
+            note: metodoPagamento==='nessuno'
+              ? (note || '')
+              : (note ? `${note} | Metodo: ${metodoPagamento}` : `Metodo: ${metodoPagamento}`),
+          } as any, payload as any);
+          setSavedId(newId);
+          return newId;
+        }
+      }
+    } catch (e: any) {
+      setError(e.message || 'Errore salvataggio');
+      return undefined;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleShareWhatsAppPdf = async () => {
+    try {
+      // Assicura salvataggio su DB e ottieni ID
+      const id = existing?.id || await saveOrUpdateAndReturnId();
+      if (!id) return;
+      // Costruisci HTML ufficiale per il documento e genera PDF
+      const built = mode==='fattura' ? await buildFatturaHtmlById(id) : await buildDDTHtmlById(id);
+      const pdfBlob = await htmlToPdfBlob(built.html);
+      const fileName = built.fileName;
+      const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+      // Preferisci condivisione diretta del file (mobile supportato)
+      const n: any = navigator;
+      if (n.canShare && n.canShare({ files: [pdfFile] })) {
+        try {
+          await n.share({ files: [pdfFile], title: fileName.replace(/\.pdf$/, '') });
+          return;
+        } catch {}
+      }
+
+      // Fallback: upload su Supabase Storage e condividi link via WhatsApp
+      const publicUrl = await apiService.uploadPdf(pdfBlob, fileName);
+      const text = `Ecco il PDF ${mode==='fattura' ? 'Fattura' : 'DDT'}: ${publicUrl}`;
+      const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
+    } catch (e: any) {
+      setError(e.message || 'Errore condivisione PDF');
+    }
+  };
+
   const handleShare = async () => {
-    const text = `Documento di vendita (${mode.toUpperCase()})\nCliente: ${cliente?.nome || ''}\nData: ${data}\nTotale: € ${totale.toFixed(2)}`;
-    if ((navigator as any).share) {
-      try { await (navigator as any).share({ title: `Documento ${mode}`, text }); } catch {}
-    } else {
-      await navigator.clipboard.writeText(text);
-      alert('Dettagli copiati negli appunti');
+    try {
+      const id = existing?.id || savedId || await saveOrUpdateAndReturnId();
+      if (!id) return;
+      const built = mode==='fattura' ? await buildFatturaHtmlById(id) : await buildDDTHtmlById(id);
+      const pdfBlob = await htmlToPdfBlob(built.html);
+      const fileName = built.fileName;
+      const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+      const n: any = navigator;
+      if (n.canShare && n.canShare({ files: [pdfFile] })) {
+        try { await n.share({ files: [pdfFile], title: fileName.replace(/\.pdf$/, '') }); return; } catch {}
+      }
+      const publicUrl = await apiService.uploadPdf(pdfBlob, fileName);
+      if (n.share) {
+        try { await n.share({ title: fileName.replace(/\.pdf$/, ''), text: publicUrl, url: publicUrl }); return; } catch {}
+      }
+      await navigator.clipboard.writeText(publicUrl);
+      alert('Link al PDF copiato negli appunti');
+    } catch (e: any) {
+      setError(e.message || 'Errore condivisione PDF');
     }
   };
 
@@ -209,7 +655,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
     const rowsText = validRows.map(r => {
       const g = r.giacenza || {} as any;
       const q = Number(r.quantita||0);
-      const unit = Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100);
+      const unit = Number(r.prezzo||0);
       return `- ${g.gruppo_nome || ''} ${g.prodotto_nome || ''} ${g.colore_nome || ''} ${g.altezza_cm || ''}cm x${q} a €${unit.toFixed(3)}`;
     }).join('%0A');
     const msg = `*${mode==='ddt' ? 'DDT' : 'Fattura'} in preparazione*%0ACliente: ${encodeURIComponent(cliente?.nome || '')}%0AData: ${data}%0A%0A${rowsText}%0A%0ATotale: € ${totale.toFixed(2)}%0ARicarico medio: ${kpi.markupWeighted.toFixed(1)}%`;
@@ -221,7 +667,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
     const lines = validRows.map(r => {
       const g = r.giacenza || {} as any;
       const q = Number(r.quantita||0);
-      const unit = Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100);
+      const unit = Number(r.prezzo||0);
       return `- ${g.gruppo_nome || ''} ${g.prodotto_nome || ''} ${g.colore_nome || ''} ${g.altezza_cm || ''}cm x${q} a €${unit.toFixed(3)}`;
     }).join('\n');
     const txt = `${mode==='ddt' ? 'DDT' : 'Fattura'}\nCliente: ${cliente?.nome || ''}\nData: ${data}\n\n${lines}\n\nImponibile: € ${imponibile.toFixed(2)}\nTotale: € ${totale.toFixed(2)}\nRicarico medio: ${kpi.markupWeighted.toFixed(1)}% (globale ${kpi.markupGlobal.toFixed(1)}%)`;
@@ -230,7 +676,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
 
   // Scadenze per DDT non salvate come campi: annotiamo in note (usate poi per differita)
 
-  const handleSave = async () => {
+  const handleSave = async (postAction: 'none'|'print'|'whatsapp'|'email' = 'none') => {
     if (saving) return;
     if (!cliente) { setError('Seleziona un cliente'); return; }
     if (righe.length === 0) { setError('Aggiungi almeno una riga'); return; }
@@ -260,8 +706,9 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
             note: note ? `${note} | Scadenza: ${dataScadenza}` : `Scadenza: ${dataScadenza}`
           } as any);
           await apiService.replaceDDTRighe(existing.id, payload as any);
+          if (postAction === 'print') await stampaDDTById(existing.id);
         } else {
-          await apiService.createDDTVendita({
+          const newId = await apiService.createDDTVendita({
             cliente_id: cliente.id,
             data_ddt: data,
             stato: 'da_fatturare',
@@ -269,13 +716,13 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
             spedizioniere: spedizioniere || null,
             note: note ? `${note} | Scadenza: ${dataScadenza}` : `Scadenza: ${dataScadenza}`
           } as any, payload as any);
+          if (postAction === 'print') await stampaDDTById(newId);
         }
-      } else {
+        } else {
         const payload = validRows.map(r => ({
           quantita: Number(r.quantita||0),
           prezzo_unitario: Number(r.prezzo||0),
-          sconto_percentuale: Number(r.sconto||0),
-          prezzo_finale: Number(r.prezzo||0) * (1 - Number(r.sconto||0)/100),
+          prezzo_finale: Number(r.prezzo||0),
           iva_percentuale: Number(r.iva||0),
           documento_carico_id: r.giacenza?.carico_id ?? null,
           articolo_id: r.giacenza?.articolo_id ?? null,
@@ -286,17 +733,34 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
           altezza_id: r.giacenza?.altezza_id ?? null,
           qualita_id: r.giacenza?.qualita_id ?? null,
         }));
-        await apiService.createFatturaVendita({
-          cliente_id: cliente.id,
-          data_fattura: data,
-          stato: 'non_pagata',
-          imponibile,
-          iva: totaleIva,
-          totale,
-          note: metodoPagamento==='nessuno'
-            ? (note || '')
-            : (note ? `${note} | Metodo: ${metodoPagamento}` : `Metodo: ${metodoPagamento}`),
-        } as any, payload as any);
+        if (existing?.id && existing.fattura) {
+          await apiService.updateFatturaVendita(existing.id, {
+            cliente_id: cliente.id,
+            data_fattura: data,
+            stato: existing.fattura.stato || 'non_pagata',
+            imponibile,
+            iva: totaleIva,
+            totale,
+            note: metodoPagamento==='nessuno'
+              ? (note || '')
+              : (note ? `${note} | Metodo: ${metodoPagamento}` : `Metodo: ${metodoPagamento}`),
+          } as any);
+          await apiService.replaceFatturaRighe(existing.id, payload as any);
+          if (postAction === 'print') await stampaFatturaById(existing.id);
+        } else {
+          const newId = await apiService.createFatturaVendita({
+            cliente_id: cliente.id,
+            data_fattura: data,
+            stato: 'non_pagata',
+            imponibile,
+            iva: totaleIva,
+            totale,
+            note: metodoPagamento==='nessuno'
+              ? (note || '')
+              : (note ? `${note} | Metodo: ${metodoPagamento}` : `Metodo: ${metodoPagamento}`),
+          } as any, payload as any);
+          if (postAction === 'print') await stampaFatturaById(newId);
+        }
       }
       window.history.back();
     } catch (e: any) {
@@ -310,12 +774,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
         <Typography variant="h5" sx={{ fontWeight: 800 }}>
           {mode === 'ddt' ? (existing?.id ? 'Modifica DDT' : 'Nuovo DDT') : 'Nuova Fattura'}
         </Typography>
-        <Stack direction="row" spacing={1}>
-          <Tooltip title="Stampa"><span><Button startIcon={<PrintIcon />} onClick={handlePrint} sx={{ borderRadius: 0 }} variant="outlined">Stampa</Button></span></Tooltip>
-          <Tooltip title="Condividi"><span><Button startIcon={<ShareIcon />} onClick={handleShare} sx={{ borderRadius: 0 }} variant="outlined">Condividi</Button></span></Tooltip>
-          <Tooltip title="WhatsApp"><span><Button startIcon={<WhatsAppIcon />} onClick={handleWhatsApp} sx={{ borderRadius: 0 }} variant="outlined" color="success">WhatsApp</Button></span></Tooltip>
-          <Tooltip title="Copia riepilogo"><span><Button startIcon={<ContentCopyIcon />} onClick={handleCopyRecap} sx={{ borderRadius: 0 }} variant="outlined">Copia</Button></span></Tooltip>
-        </Stack>
+        
       </Box>
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 0 }}>
         <Stepper activeStep={active} alternativeLabel>
@@ -404,8 +863,8 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
                 <TextField label="Qta" type="number" value={r.quantita}
                   onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], quantita:e.target.value}; setRighe(arr);} }
                   inputProps={{ min: r.imballoQuant || r.giacenza?.imballo_quantita || 1, step: r.imballoQuant || r.giacenza?.imballo_quantita || 1 }}
-                  error={!!r.giacenza && (Number(r.quantita||0) % Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1) !== 0)}
-                  helperText={r.giacenza ? `Imballo: ${r.imballoQuant || r.giacenza?.imballo_quantita || 1} steli` : ''}
+                  error={!!r.giacenza && (Number(r.quantita||0) % Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1) !== 0 || Number(r.quantita||0) > Number(r.giacenza?.quantita_giacenza || 0))}
+                  helperText={r.giacenza ? `Imballo: ${r.imballoQuant || r.giacenza?.imballo_quantita || 1} • Disponibile: ${r.giacenza?.quantita_giacenza ?? 0}` : ''}
                   sx={fieldSx}
                 />
               </Grid>
@@ -418,7 +877,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
                 </Grid>
               )}
               <Grid item xs={6} md={1.5 as any}><TextField label="Prezzo" type="number" value={r.prezzo} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], prezzo:e.target.value}; setRighe(arr);} } sx={fieldSx} /></Grid>
-              <Grid item xs={6} md={1.5 as any}><TextField label="Sconto %" type="number" value={r.sconto} onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], sconto:e.target.value}; setRighe(arr);} } sx={fieldSx} /></Grid>
+              {/* Sconto rimosso: il prezzo è sempre manuale o da listino */}
               <Grid item xs={6} md={1.5 as any}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Listino</InputLabel>
@@ -455,9 +914,9 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
                 </Stack>
               </Grid>
               <Grid item xs={12}>
-                {(() => {
+              {(() => {
                   const q = Number(r.quantita||0);
-                  const pu = Number(r.prezzo||0)*(1-Number(r.sconto||0)/100);
+                  const pu = Number(r.prezzo||0);
                   const cu = Number(r.giacenza?.prezzo_costo_finale_per_stelo || r.giacenza?.prezzo_acquisto_per_stelo || 0);
                   const subtotal = q*pu;
                   const markup = cu>0 ? ((pu-cu)/cu)*100 : 0;
@@ -525,19 +984,37 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
         </Paper>
       )}
 
-      <Box sx={{ mt:2, display:'flex', justifyContent:'space-between' }}>
-        <Button onClick={()=> active===0 ? safeBack(navigate, '/vendite') : setActive(active-1)}>Indietro</Button>
-        {active < steps.length-1 && <Button variant="contained" onClick={()=>setActive(active+1)} disabled={(active===0 && !cliente) || (active===1 && !canProceed)} sx={{ borderRadius: 0 }}>Avanti</Button>}
-        {active === steps.length-1 && (
-          <Stack direction="row" spacing={1}>
-            {mode==='ddt' && existing?.id && (
-              <Button color="error" variant="outlined" onClick={async()=>{ try{ setSaving(true); await apiService.annullaDDTVendita(existing.id); safeBack(navigate,'/vendite'); } finally{ setSaving(false);} }} sx={{ borderRadius:0 }}>Annulla DDT</Button>
-            )}
-            <Button variant="contained" onClick={handleSave} disabled={saving || !canProceed} sx={{ borderRadius: 0 }}>
-              {mode==='ddt' && existing?.id ? 'Salva modifiche' : 'Conferma'}
-            </Button>
-          </Stack>
-        )}
+      <Box sx={{ mt:2, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button onClick={()=> active===0 ? safeBack(navigate, '/vendite') : setActive(active-1)}>Indietro</Button>
+          {mode==='ddt' && existing?.id && (
+            <Button color="error" variant="outlined" onClick={async()=>{ try{ setSaving(true); await apiService.annullaDDTVendita(existing.id); safeBack(navigate,'/vendite'); } finally{ setSaving(false);} }} sx={{ borderRadius:0 }}>Annulla DDT</Button>
+          )}
+        </Stack>
+        <Stack direction="row" spacing={1}>
+          {active < steps.length-1 && (
+            <Button variant="contained" onClick={()=>setActive(active+1)} disabled={(active===0 && !cliente) || (active===1 && !canProceed)} sx={{ borderRadius: 0 }}>Avanti</Button>
+          )}
+          {active === steps.length-1 && (
+            <>
+              <Button variant="contained" onClick={async()=>{ const id = await saveOrUpdateAndReturnId(); if (id) setSavedId(id); }} disabled={saving || !canProceed} sx={{ borderRadius: 0 }}>
+                Salva
+              </Button>
+              <Button variant="outlined" onClick={async()=>{ const id = existing?.id || await saveOrUpdateAndReturnId(); if (!id) return; if (mode==='fattura') await stampaFatturaById(id); else await stampaDDTById(id); }} disabled={saving || !canProceed} sx={{ borderRadius: 0 }}>
+                Stampa
+              </Button>
+              <Button variant="outlined" color="success" startIcon={<WhatsAppIcon />} onClick={handleShareWhatsAppPdf} disabled={saving || !canProceed} sx={{ borderRadius: 0 }}>
+                WhatsApp
+              </Button>
+              <Button variant="outlined" startIcon={<ShareIcon />} onClick={handleShare} sx={{ borderRadius: 0 }}>
+                Condividi
+              </Button>
+              <Button variant="outlined" startIcon={<ContentCopyIcon />} onClick={handleCopyRecap} sx={{ borderRadius: 0 }}>
+                Copia
+              </Button>
+            </>
+          )}
+        </Stack>
       </Box>
     </Box>
   );

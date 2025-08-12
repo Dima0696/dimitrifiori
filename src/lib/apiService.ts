@@ -417,6 +417,31 @@ export interface FatturaVendita {
   iva: number;
   totale: number;
   note?: string | null;
+  // Nuovi metadati per policy
+  tipo_fattura?: 'immediata' | 'differita';
+  trasmessa_ade_at?: string | null;
+  created_at?: string;
+}
+
+export interface FatturaVenditaRiga {
+  id: number;
+  fattura_id: number;
+  ordine_riga_id?: number | null;
+  articolo_id?: number | null;
+  gruppo_id?: number | null;
+  prodotto_id?: number | null;
+  colore_id?: number | null;
+  provenienza_id?: number | null;
+  foto_id?: number | null;
+  imballo_id?: number | null;
+  altezza_id?: number | null;
+  qualita_id?: number | null;
+  quantita: number;
+  prezzo_unitario: number;
+  sconto_percentuale?: number;
+  prezzo_finale: number;
+  iva_percentuale?: number;
+  note?: string | null;
 }
 
 export interface NotaCreditoVendita {
@@ -577,20 +602,23 @@ class ApiService {
       .single();
     if (ed) throw ed;
     const ddtId = (d as any).id as number;
-    if (righe && righe.length > 0) {
-      const { error: er } = await supabase
-        .from('ddt_vendita_righe')
-        .insert(righe.map(r => ({ ...r, ddt_id: ddtId })));
-      if (er) throw er;
+    try {
+      if (righe && righe.length > 0) {
+        const { error: er } = await supabase
+          .from('ddt_vendita_righe')
+          .insert(righe.map(r => ({ ...r, ddt_id: ddtId })));
+        if (er) throw er;
+      }
+      return ddtId;
+    } catch (e) {
+      // Rollback best-effort: elimina testata se righe falliscono
+      await supabase.from('ddt_vendita').delete().eq('id', ddtId);
+      throw e;
     }
-    return ddtId;
   }
 
   async annullaDDTVendita(id: number): Promise<void> {
-    const { error } = await supabase
-      .from('ddt_vendita')
-      .update({ stato: 'annullato' })
-      .eq('id', id);
+    const { error } = await supabase.rpc('annulla_ddt_vendita', { p_ddt_id: id });
     if (error) throw error;
   }
 
@@ -631,13 +659,98 @@ class ApiService {
     if (ef) throw ef;
     const fatturaId = (f as any).id as number;
 
-    if (righe?.length) {
-      const payload = righe.map(r => ({ ...r, fattura_id: fatturaId, sconto_percentuale: r.sconto_percentuale ?? 0, iva_percentuale: r.iva_percentuale ?? 0 }));
-      const { error: er } = await supabase.from('fatture_vendita_righe').insert(payload);
-      if (er) throw er;
-    }
+    try {
+      if (righe?.length) {
+        const payload = righe.map(r => ({ ...r, fattura_id: fatturaId, sconto_percentuale: r.sconto_percentuale ?? 0, iva_percentuale: r.iva_percentuale ?? 0 }));
+        const { error: er } = await supabase.from('fatture_vendita_righe').insert(payload);
+        if (er) throw er;
+      }
 
-    return fatturaId;
+      return fatturaId;
+    } catch (e) {
+      // Rollback best-effort per evitare fatture senza righe
+      await supabase.from('fatture_vendita').delete().eq('id', fatturaId);
+      throw e;
+    }
+  }
+
+  async duplicaFattura(fatturaId: number): Promise<{ nuova_fattura_id: number }> {
+    const { data: fatt, error: e1 } = await supabase
+      .from('fatture_vendita')
+      .select('*')
+      .eq('id', fatturaId)
+      .single();
+    if (e1) throw e1;
+    const { data: righe, error: e2 } = await supabase
+      .from('fatture_vendita_righe')
+      .select('*')
+      .eq('fattura_id', fatturaId);
+    if (e2) throw e2;
+
+    const nuovo: any = { ...fatt };
+    delete nuovo.id; delete nuovo.numero_fattura; // verrà generato
+    const nuovaId = await this.createFatturaVendita(nuovo, (righe as any[]).map(r => {
+      const c = { ...r };
+      delete (c as any).id; delete (c as any).fattura_id;
+      return c;
+    }));
+    return { nuova_fattura_id: nuovaId };
+  }
+
+  async updateFatturaVendita(id: number, fattura: Partial<Omit<FatturaVendita, 'id' | 'numero_fattura'>>): Promise<void> {
+    const { error } = await supabase.from('fatture_vendita').update(fattura).eq('id', id);
+    if (error) throw error;
+  }
+
+  async replaceFatturaRighe(id: number, righe: Array<{
+    articolo_id?: number | null;
+    gruppo_id?: number | null;
+    prodotto_id?: number | null;
+    colore_id?: number | null;
+    provenienza_id?: number | null;
+    foto_id?: number | null;
+    imballo_id?: number | null;
+    altezza_id?: number | null;
+    qualita_id?: number | null;
+    quantita: number;
+    prezzo_unitario: number;
+    sconto_percentuale?: number;
+    prezzo_finale: number;
+    iva_percentuale?: number;
+  }>): Promise<void> {
+    // Cancella le righe esistenti della fattura
+    const { error: e1 } = await supabase.from('fatture_vendita_righe').delete().eq('fattura_id', id);
+    if (e1) throw e1;
+
+    // Inserisce le nuove righe (se presenti)
+    if (righe?.length) {
+      const payload = righe.map(r => ({
+        ...r,
+        fattura_id: id,
+        sconto_percentuale: r.sconto_percentuale ?? 0,
+        iva_percentuale: r.iva_percentuale ?? 0,
+      }));
+      const { error: e2 } = await supabase.from('fatture_vendita_righe').insert(payload);
+      if (e2) throw e2;
+    }
+  }
+
+  async getFatturaVenditaById(id: number): Promise<{ fattura: FatturaVendita; righe: FatturaVenditaRiga[] }> {
+    const { data: fatt, error: e1 } = await supabase
+      .from('fatture_vendita')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (e1) throw e1;
+
+    const { data: righe, error: e2 } = await supabase
+      .from('fatture_vendita_righe')
+      .select('*')
+      .eq('fattura_id', id)
+      .order('id');
+    if (e2) throw e2;
+
+    return { fattura: fatt as any, righe: (righe as any) || [] };
   }
 
   async generaFatturaVenditaDaDDT(ddtId: number): Promise<{ fattura_id: number; numero_fattura: string }> {
@@ -685,6 +798,14 @@ class ApiService {
 
   async eliminaFatturaVendita(fatturaId: number): Promise<void> {
     const { error } = await supabase.rpc('elimina_fattura_vendita_completa', { p_fattura_id: fatturaId });
+    if (error) throw error;
+  }
+
+  async annullaFatturaVendita(fatturaId: number, reintegra: boolean = false): Promise<void> {
+    const { error } = await supabase.rpc('annulla_fattura_vendita', {
+      p_fattura_id: fatturaId,
+      p_reintegra: reintegra
+    });
     if (error) throw error;
   }
 
@@ -1100,6 +1221,35 @@ class ApiService {
       };
     } catch (error) {
       console.error('Errore upload foto:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Carica un PDF su Supabase Storage e restituisce l'URL pubblico.
+   * Nota: usiamo il bucket esistente 'foto-articoli' nella cartella 'pdf/'.
+   * In futuro possiamo spostare su un bucket dedicato (es. 'documenti').
+   */
+  async uploadPdf(blob: Blob, filename: string): Promise<string> {
+    try {
+      const safeName = filename.replace(/[^a-zA-Z0-9._-]+/g, '-');
+      const objectPath = `pdf/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('foto-articoli')
+        .upload(objectPath, blob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: 'application/pdf'
+        });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('foto-articoli')
+        .getPublicUrl(objectPath);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Errore upload PDF:', error);
       throw error;
     }
   }
@@ -1548,6 +1698,9 @@ class ApiService {
     prezzo_vendita_3?: number;
     note?: string;
   }): Promise<any> {
+    if (!dati || dati.quantita == null || Number(dati.quantita) <= 0) {
+      throw new Error('Quantità carico non valida: deve essere > 0');
+    }
     const { data, error } = await supabase
       .from('documenti_carico')
       .insert([{
@@ -2130,8 +2283,32 @@ class ApiService {
         }
       }
 
-      const unione = [...movimentiCarico, ...movimentiScarico]
-        .sort((a: any, b: any) => new Date(b.data).getTime() - new Date(a.data).getTime());
+      // 3) Movimenti manuali (rientri da annullamento) dal registro movimenti_magazzino
+      let movimentiManuali: any[] = [];
+      try {
+        const { data: man, error: manErr } = await supabase
+          .from('movimenti_magazzino')
+          .select('*')
+          .eq('prodotto_id', (articolo as any).prodotto_id)
+          .eq('gruppo_id', (articolo as any).gruppo_id)
+          .eq('colore_id', (articolo as any).colore_id)
+          .eq('imballo_id', (articolo as any).imballo_id)
+          .eq('altezza_id', (articolo as any).altezza_id);
+        if (!manErr && man) {
+          movimentiManuali = man.map(m => ({
+            ...m,
+            data: m.data || m.created_at,
+            altezza_nome: null,
+            fattura_numero: m.fattura_numero || null,
+            tipo: m.tipo, // 'carico' per rientri
+          }));
+        }
+      } catch (e) {
+        console.warn('⚠️ Errore lettura movimenti manuali per articolo:', (e as any).message);
+      }
+
+      const unione = [...movimentiCarico, ...movimentiScarico, ...movimentiManuali]
+        .sort((a: any, b: any) => new Date(b.data || b.created_at).getTime() - new Date(a.data || a.created_at).getTime());
 
       console.log(`✅ Trovati ${unione.length} movimenti totali per articolo ${articolo_id}`);
       return unione as any;
@@ -2886,7 +3063,7 @@ class ApiService {
     ordineId?: number;
   }): Promise<MovimentoMagazzino[]> {
     try {
-      // Usa la vista completa con tutti i nomi joinati
+      // 1) Vista storica completa (scarichi da vendite, distruzioni, ecc.)
       let query = supabase
         .from('view_movimenti_magazzino_completi')
         .select(`*`)
@@ -2923,8 +3100,28 @@ class ApiService {
         throw error;
       }
 
-      // Trasforma i dati includendo le informazioni complete
-      const movimentiConNomi = (data || []).map((movimento: any) => {
+      // 2) Movimenti registrati manualmente (rientri da annullamento ecc.)
+      //    Li uniamo alla vista per vedere i "carichi" di rientro
+      let queryManual = supabase
+        .from('movimenti_magazzino')
+        .select('*')
+        .order('data', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (filtri?.tipo) queryManual = queryManual.eq('tipo', filtri.tipo);
+      if (filtri?.dataInizio) queryManual = queryManual.gte('data', filtri.dataInizio);
+      if (filtri?.dataFine) queryManual = queryManual.lte('data', filtri.dataFine);
+      if (filtri?.gruppoId) queryManual = queryManual.eq('gruppo_id', filtri.gruppoId);
+      if (filtri?.prodottoId) queryManual = queryManual.eq('prodotto_id', filtri.prodottoId);
+      if (filtri?.coloreId) queryManual = queryManual.eq('colore_id', filtri.coloreId);
+
+      const { data: manualData, error: errManual } = await queryManual;
+      if (errManual) {
+        console.warn('⚠️ Errore lettura movimenti manuali, continuo solo con vista:', errManual.message);
+      }
+
+      // 3) Normalizzazione vista
+      const movimentiVista = (data || []).map((movimento: any) => {
         const altezza_nome = movimento.altezza_cm ? `${movimento.altezza_cm} cm` : (movimento.altezza_nome || null);
         const articolo_completo = [
           movimento.prodotto_nome || movimento.gruppo_nome,
@@ -2941,8 +3138,27 @@ class ApiService {
         };
       });
 
-      console.log('✅ Movimenti caricati con nomi:', movimentiConNomi.length);
-      return movimentiConNomi;
+      // 4) Normalizzazione movimenti manuali
+      const movimentiManuali = (manualData || []).map((m: any) => ({
+        ...m,
+        // Adattamento a struttura vista
+        tipo: m.tipo,                    // 'carico' per rientri
+        data: m.data || m.created_at,
+        valore_totale: m.valore_totale,
+        prezzo_unitario: m.prezzo_unitario,
+        gruppo_nome: m.gruppo_id ? null : null,
+        prodotto_nome: m.prodotto_id ? null : null,
+        colore_nome: m.colore_id ? null : null,
+        altezza_cm: null,
+        altezza_nome: null,
+        articolo_completo: null,
+      }));
+
+      const unione = [...movimentiVista, ...movimentiManuali]
+        .sort((a: any, b: any) => new Date(b.data || b.created_at).getTime() - new Date(a.data || a.created_at).getTime());
+
+      console.log('✅ Movimenti caricati (vista+manuali):', unione.length);
+      return unione as any;
     } catch (error) {
       console.error('❌ Errore nel caricamento movimenti:', error);
       throw error;

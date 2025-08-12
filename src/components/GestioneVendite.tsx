@@ -30,7 +30,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PaidIcon from '@mui/icons-material/Paid';
 import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
-import DeleteIcon from '@mui/icons-material/Delete';
+// import DeleteIcon from '@mui/icons-material/Delete';
 import ReceiptIcon from '@mui/icons-material/ReceiptLong';
 import PrintIcon from '@mui/icons-material/Print';
 import AddCardIcon from '@mui/icons-material/AddCard';
@@ -41,6 +41,9 @@ import ModernSearchBar from './ui/ModernSearchBar';
 import SegmentedControl from './ui/SegmentedControl';
 import EmailIcon from '@mui/icons-material/Email';
 import { useNavigate } from 'react-router-dom';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FileCopyIcon from '@mui/icons-material/FileCopyOutlined';
+import CancelIcon from '@mui/icons-material/CancelOutlined';
 
 function StatCard({ title, value, subtitle, color }: { title: string; value: string | number; subtitle?: string; color: string }) {
   return (
@@ -88,6 +91,51 @@ export default function GestioneVendite() {
     border: 'rgba(148, 163, 184, 0.25)'
   };
 
+  const formatEuro = React.useCallback((n: number) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n || 0), []);
+  const inPeriodo = React.useCallback((dateStr?: string | null) => {
+    if (!dateStr) return false;
+    const d = dateStr;
+    if (dataDa && d < dataDa) return false;
+    if (dataA && d > dataA) return false;
+    if (periodo === 'tutto') return true;
+    if (periodo === 'oggi') return d === new Date().toISOString().slice(0, 10);
+    if (periodo === 'settimana') {
+      const today = new Date();
+      const start = new Date(today);
+      start.setDate(today.getDate() - 6);
+      return d >= start.toISOString().slice(0, 10) && d <= today.toISOString().slice(0, 10);
+    }
+    if (periodo === 'mese') return d.slice(0, 7) === new Date().toISOString().slice(0, 7);
+    if (periodo === 'anno') return d.slice(0, 4) === new Date().getFullYear().toString();
+    return true;
+  }, [dataDa, dataA, periodo]);
+
+  const filteredOrdini = React.useMemo(() => (
+    ordini
+      .filter(o => (q === '' || String(o.numero_ordine || o.id).includes(q) || (o.cliente_nome || '').toLowerCase().includes(q.toLowerCase())))
+      .filter(o => (!clienteFiltro || o.cliente_id === clienteFiltro.id))
+      .filter(o => (!statoFiltro || o.stato === statoFiltro))
+      .filter(o => inPeriodo(o.data_ordine))
+  ), [ordini, q, clienteFiltro, statoFiltro, inPeriodo]);
+
+  const filteredDdt = React.useMemo(() => (
+    ddt
+      .filter(d => (q === '' || String(d.numero_ddt || d.id).includes(q) || (d.cliente_nome || '').toLowerCase().includes(q.toLowerCase())))
+      .filter(d => (!clienteFiltro || d.cliente_id === clienteFiltro.id))
+      .filter(d => (!statoFiltro || d.stato === statoFiltro))
+      .filter(d => inPeriodo(d.data_ddt))
+  ), [ddt, q, clienteFiltro, statoFiltro, inPeriodo]);
+
+  const filteredFatture = React.useMemo(() => (
+    fatture
+      .filter(f => (q === '' || String(f.numero_fattura || f.id).includes(q) || (f.cliente_nome || '').toLowerCase().includes(q.toLowerCase())))
+      .filter(f => (!clienteFiltro || f.cliente_id === clienteFiltro.id))
+      .filter(f => (!statoFiltro || f.stato === statoFiltro))
+      .filter(f => inPeriodo(f.data_fattura))
+  ), [fatture, q, clienteFiltro, statoFiltro, inPeriodo]);
+
+  const scadMap = React.useMemo(() => new Map(scadenziario.map(r => [r.fattura_id, r])), [scadenziario]);
+
   const loadAll = React.useCallback(async () => {
     try {
       setLoading(true);
@@ -129,6 +177,36 @@ export default function GestioneVendite() {
     }
   };
 
+  const handleAnnullaDDT = async (id: number) => {
+    if (!confirm("Confermi l'annullamento del DDT?")) return;
+    try {
+      setLoading(true);
+      await apiService.annullaDDTVendita(id);
+      await loadAll();
+    } catch (e: any) {
+      setError(e.message || 'Errore annullamento DDT');
+    } finally { setLoading(false); }
+  };
+
+  const handleAnnullaFattura = async (fattura: FatturaVendita) => {
+    if (!confirm("Confermi l'annullamento della fattura?")) return;
+    try {
+      setLoading(true);
+      // Per sicurezza ricarico la fattura dal DB (la lista potrebbe non avere tipo_fattura/created_at)
+      let reintegra = true; // default: immediate
+      try {
+        const { fattura: fDett } = await (apiService as any).getFatturaVenditaById(fattura.id);
+        const tipo = (fDett && (fDett as any).tipo_fattura) || (fattura as any).tipo_fattura || 'immediata';
+        reintegra = tipo === 'immediata';
+      } catch {}
+
+      await apiService.annullaFatturaVendita(fattura.id, reintegra);
+      await loadAll();
+    } catch (e: any) {
+      setError(e.message || 'Errore annullamento fattura');
+    } finally { setLoading(false); }
+  };
+
   const handleStampaDDT = async (id: number) => {
     try {
       const [{ ddt: d, righe }, gruppi, prodotti, colori, altezze, imballi] = await Promise.all([
@@ -142,8 +220,9 @@ export default function GestioneVendite() {
       const gMap = new Map(gruppi.map((x:any)=>[x.id, x.nome]));
       const pMap = new Map(prodotti.map((x:any)=>[x.id, x.nome]));
       const cMap = new Map(colori.map((x:any)=>[x.id, x.nome]));
-      const aMap = new Map(altezze.map((x:any)=>[x.id, x.cm]));
+      const aMap = new Map(altezze.map((x:any)=>[x.id, x.altezza_cm]));
       const iMap = new Map(imballi.map((x:any)=>[x.id, x.nome]));
+      const clienteDett = clienti.find(c => c.id === d.cliente_id) || null;
       const w = window.open('', '_blank');
       if (!w) return;
       const rows = (righe || [])
@@ -155,40 +234,181 @@ export default function GestioneVendite() {
           const imballo = iMap.get(r.imballo_id) || '';
           const titolo = `${String(gruppo).toUpperCase()} - ${String(prodotto).toUpperCase()}`;
           const sotto = `${colore} • ${altezza}${altezza ? 'cm' : ''} • ${imballo}`;
+          const prezzo = (r.prezzo_unitario ?? r.prezzo_finale ?? 0);
+          const imponibileRiga = (Number(r.quantita||0) * Number(prezzo||0));
           return `<tr>
             <td>
               <div style="font-weight:700">${titolo}</div>
               <div style="color:#64748b;font-size:12px">${sotto}</div>
             </td>
-            <td>${r.quantita}</td>
-            <td>${r.prezzo_unitario ?? r.prezzo_finale ?? ''}</td>
-            <td>${r.iva_percentuale ?? 0}%</td>
+            <td style="text-align:right">${r.quantita}</td>
+            <td style="text-align:right">€ ${Number(prezzo||0).toFixed(3)}</td>
+            <td style="text-align:right">€ ${imponibileRiga.toFixed(2)}</td>
           </tr>`;
         })
         .join('');
+      const totImponibile = (righe||[]).reduce((s:any, r:any)=> s + Number(r.quantita||0)*Number(r.prezzo_unitario ?? r.prezzo_finale ?? 0), 0);
       w.document.write(`
         <html><head><title>DDT ${d.numero_ddt || d.id}</title>
         <style>
-          body{font-family:Arial;padding:24px}
-          h1{margin:0 0 8px}
+          *{box-sizing:border-box}
+          body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; padding:28px; color:#0f172a}
+          h1{margin:0 0 2px}
           .muted{color:#64748b}
+          .header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #f59e0b; padding-bottom:8px; margin-bottom:12px}
+          .badge{background:#f59e0b; color:white; padding:4px 8px; font-weight:700; letter-spacing:.5px}
           table{width:100%;border-collapse:collapse;margin-top:12px}
-          th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}
-          thead th{background:#f8fafc}
+          th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top}
+          thead th{background:#fff7ed}
+          .totali{margin-top:12px; display:flex; gap:16px; justify-content:flex-end}
+          .tot-card{border:1px solid #e5e7eb; padding:10px 12px; min-width:220px}
+          .label{color:#64748b; font-size:12px}
         </style>
         </head><body>
-        <h1>DDT ${d.numero_ddt || d.id}</h1>
-        <div class="muted">Data: ${d.data_ddt} • Cliente: ${d.cliente_nome || d.cliente_id || ''}</div>
-        <div class="muted">Destinazione: ${d.destinazione || '-'} • Spedizioniere: ${d.spedizioniere || '-'}</div>
+        <div class="header">
+          <div>
+            <div class="badge">DOCUMENTO DI TRASPORTO</div>
+            <h1>DDT ${d.numero_ddt || d.id}</h1>
+            <div class="muted">Data: ${d.data_ddt}</div>
+          </div>
+          <div>
+            <div style="font-weight:700">${d.cliente_nome || clienteDett?.nome || d.cliente_id || ''}</div>
+            <div class="muted">${clienteDett?.ragione_sociale || ''}</div>
+            <div class="muted">${[clienteDett?.indirizzo, clienteDett?.cap, clienteDett?.citta, clienteDett?.provincia].filter(Boolean).join(' ')}</div>
+            <div class="muted">P.IVA: ${clienteDett?.partita_iva || '-'} • CF: ${clienteDett?.codice_fiscale || '-'}</div>
+            <div class="muted">Destinazione: ${d.destinazione || '-'}</div>
+            <div class="muted">Spedizioniere: ${d.spedizioniere || '-'}</div>
+            ${d.note ? `<div class="muted">Note: ${d.note}</div>` : ''}
+          </div>
+        </div>
         <table>
-          <thead><tr><th>Articolo</th><th>Qta</th><th>Prezzo</th><th>IVA</th></tr></thead>
+          <thead><tr><th>Articolo</th><th style="text-align:right">Qta</th><th style="text-align:right">Prezzo</th><th style="text-align:right">Imponibile</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
+        <div class="totali">
+          <div class="tot-card">
+            <div class="label">Totale Imponibile</div>
+            <div style="font-weight:800">€ ${totImponibile.toFixed(2)}</div>
+          </div>
+        </div>
         <script>window.onload=()=>window.print()</script>
         </body></html>`);
       w.document.close();
     } catch (e) {
       alert('Errore stampa DDT');
+    }
+  };
+
+  const handleStampaFattura = async (id: number) => {
+    try {
+      const [{ fattura: f, righe }, gruppi, prodotti, colori, altezze, imballi, clientiAll] = await Promise.all([
+        apiService.getFatturaVenditaById(id),
+        apiService.getGruppi(),
+        apiService.getProdotti(),
+        apiService.getColori(),
+        apiService.getAltezze(),
+        apiService.getImballaggi(),
+        apiService.getClienti()
+      ]);
+      const gMap = new Map(gruppi.map((x:any)=>[x.id, x.nome]));
+      const pMap = new Map(prodotti.map((x:any)=>[x.id, x.nome]));
+      const cMap = new Map(colori.map((x:any)=>[x.id, x.nome]));
+      const aMap = new Map(altezze.map((x:any)=>[x.id, x.altezza_cm]));
+      const iMap = new Map(imballi.map((x:any)=>[x.id, x.nome]));
+      const clienteDett = (clientiAll || []).find((c:any)=>c.id===f.cliente_id) || null;
+      const w = window.open('', '_blank');
+      if (!w) return;
+      const rows = (righe || [])
+        .map((r: any) => {
+          const gruppo = gMap.get(r.gruppo_id) || '';
+          const prodotto = pMap.get(r.prodotto_id) || '';
+          const colore = cMap.get(r.colore_id) || '';
+          const altezza = aMap.get(r.altezza_id) || '';
+          const imballo = iMap.get(r.imballo_id) || '';
+          const titolo = `${String(gruppo).toUpperCase()} - ${String(prodotto).toUpperCase()}`;
+          const sotto = `${colore} • ${altezza}${altezza ? 'cm' : ''} • ${imballo}`;
+          const pu = Number(r.prezzo_unitario||0) * (1 - Number(r.sconto_percentuale||0)/100);
+          const imponibileRiga = Number(r.quantita||0) * pu;
+          const ivaRiga = Number(r.iva_percentuale||0) * imponibileRiga / 100;
+          const totaleRiga = imponibileRiga + ivaRiga;
+          return `<tr>
+            <td>
+              <div style="font-weight:700">${titolo}</div>
+              <div style="color:#64748b;font-size:12px">${sotto}</div>
+            </td>
+            <td style="text-align:right">${r.quantita}</td>
+            <td style="text-align:right">€ ${pu.toFixed(3)}</td>
+            <td style="text-align:right">${r.sconto_percentuale? r.sconto_percentuale+'%' : ''}</td>
+            <td style="text-align:right">${r.iva_percentuale||0}%</td>
+            <td style="text-align:right">€ ${imponibileRiga.toFixed(2)}</td>
+            <td style="text-align:right">€ ${ivaRiga.toFixed(2)}</td>
+            <td style="text-align:right">€ ${totaleRiga.toFixed(2)}</td>
+          </tr>`;
+        })
+        .join('');
+      const totImponibile = (righe||[]).reduce((s:any, r:any)=> s + Number(r.quantita||0)* (Number(r.prezzo_unitario||0) * (1-Number(r.sconto_percentuale||0)/100)), 0);
+      const totIva = (righe||[]).reduce((s:any, r:any)=> {
+        const base = Number(r.quantita||0)* (Number(r.prezzo_unitario||0) * (1-Number(r.sconto_percentuale||0)/100));
+        return s + base * (Number(r.iva_percentuale||0)/100);
+      }, 0);
+      const tot = totImponibile + totIva;
+      w.document.write(`
+        <html><head><title>Fattura ${f.numero_fattura || f.id}</title>
+        <style>
+          *{box-sizing:border-box}
+          body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; padding:28px; color:#0f172a}
+          h1{margin:0 0 2px}
+          .muted{color:#64748b}
+          .header{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #f59e0b; padding-bottom:8px; margin-bottom:12px}
+          .badge{background:#f59e0b; color:white; padding:4px 8px; font-weight:700; letter-spacing:.5px}
+          table{width:100%;border-collapse:collapse;margin-top:12px}
+          th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left;vertical-align:top}
+          thead th{background:#fff7ed}
+          .totali{margin-top:12px; display:flex; gap:16px; justify-content:flex-end}
+          .tot-card{border:1px solid #e5e7eb; padding:10px 12px; min-width:220px}
+          .label{color:#64748b; font-size:12px}
+        </style>
+        </head><body>
+        <div class="header">
+          <div>
+            <div class="badge">FATTURA</div>
+            <h1>${f.numero_fattura || f.id}</h1>
+            <div class="muted">Data: ${f.data_fattura}</div>
+          </div>
+          <div>
+            <div style="font-weight:700">${f.cliente_nome || clienteDett?.nome || f.cliente_id || ''}</div>
+            <div class="muted">${clienteDett?.ragione_sociale || ''}</div>
+            <div class="muted">${[clienteDett?.indirizzo, clienteDett?.cap, clienteDett?.citta, clienteDett?.provincia].filter(Boolean).join(' ')}</div>
+            <div class="muted">P.IVA: ${clienteDett?.partita_iva || '-'} • CF: ${clienteDett?.codice_fiscale || '-'}</div>
+            <div class="muted">Stato: ${f.stato}</div>
+            ${f.note ? `<div class=\"muted\">Note: ${f.note}</div>` : ''}
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Articolo</th>
+              <th style="text-align:right">Qta</th>
+              <th style="text-align:right">Prezzo</th>
+              <th style="text-align:right">Sconto</th>
+              <th style="text-align:right">IVA</th>
+              <th style="text-align:right">Imponibile</th>
+              <th style="text-align:right">IVA</th>
+              <th style="text-align:right">Totale</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="totali">
+          <div class="tot-card"><div class="label">Imponibile</div><div style="font-weight:800">€ ${totImponibile.toFixed(2)}</div></div>
+          <div class="tot-card"><div class="label">IVA</div><div style="font-weight:800">€ ${totIva.toFixed(2)}</div></div>
+          <div class="tot-card"><div class="label">Totale</div><div style="font-weight:800">€ ${tot.toFixed(2)}</div></div>
+        </div>
+        <script>window.onload=()=>window.print()</script>
+        </body></html>`);
+      w.document.close();
+    } catch (e) {
+      alert('Errore stampa Fattura');
     }
   };
 
@@ -399,7 +619,9 @@ export default function GestioneVendite() {
           {tab === 0 && (
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: colors.text }}>Ordini cliente</Typography>
-              <Table size="small">
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={9}>
+                  <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>N.</TableCell>
@@ -410,24 +632,7 @@ export default function GestioneVendite() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {ordini
-                    .filter(o => (q==='' || String(o.numero_ordine||o.id).includes(q) || (o.cliente_nome||'').toLowerCase().includes(q.toLowerCase())))
-                    .filter(o => (!clienteFiltro || o.cliente_id===clienteFiltro.id))
-                    .filter(o => (!statoFiltro || o.stato===statoFiltro))
-                    .filter(o => {
-                      const d = o.data_ordine;
-                      if (dataDa && d < dataDa) return false;
-                      if (dataA && d > dataA) return false;
-                      if (periodo==='oggi') return d === new Date().toISOString().slice(0,10);
-                      if (periodo==='settimana') {
-                        const today = new Date();
-                        const start = new Date(today); start.setDate(today.getDate()-6);
-                        return d >= start.toISOString().slice(0,10) && d <= today.toISOString().slice(0,10);
-                      }
-                      if (periodo==='mese') return d.slice(0,7) === new Date().toISOString().slice(0,7);
-                      if (periodo==='anno') return d.slice(0,4) === new Date().getFullYear().toString();
-                      return true;
-                    })
+                  {filteredOrdini
                     .map(o => (
                     <TableRow key={o.id} hover>
                       <TableCell>{o.numero_ordine || o.id}</TableCell>
@@ -444,13 +649,24 @@ export default function GestioneVendite() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                  </Table>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Stack spacing={1.25} sx={{ position: { md:'sticky' }, top: { md: 16 }, p: { md: 0 } }}>
+                    <StatCard title="Ordini filtrati" value={filteredOrdini.length} color={colors.sales} />
+                    <StatCard title="Aperti" value={filteredOrdini.filter(o=>o.stato!=='annullato' && o.stato!=='fatturato').length} color="#0ea5e9" />
+                    <StatCard title="Annullati" value={filteredOrdini.filter(o=>o.stato==='annullato').length} color="#ef4444" />
+                  </Stack>
+                </Grid>
+              </Grid>
             </Box>
           )}
           {tab === 1 && (
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: colors.text }}>Picking e DDT</Typography>
-              <Table size="small">
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={9}>
+                  <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>N.</TableCell>
@@ -461,51 +677,53 @@ export default function GestioneVendite() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {ddt
-                    .filter(d => (q==='' || String(d.numero_ddt||d.id).includes(q) || (d.cliente_nome||'').toLowerCase().includes(q.toLowerCase())))
-                    .filter(d => (!clienteFiltro || d.cliente_id===clienteFiltro.id))
-                    .filter(d => (!statoFiltro || d.stato===statoFiltro))
-                    .filter(d => {
-                      const data = d.data_ddt;
-                      if (dataDa && data < dataDa) return false;
-                      if (dataA && data > dataA) return false;
-                      if (periodo==='oggi') return data === new Date().toISOString().slice(0,10);
-                      if (periodo==='settimana') {
-                        const today = new Date();
-                        const start = new Date(today); start.setDate(today.getDate()-6);
-                        return data >= start.toISOString().slice(0,10) && data <= today.toISOString().slice(0,10);
-                      }
-                      if (periodo==='mese') return data.slice(0,7) === new Date().toISOString().slice(0,7);
-                      if (periodo==='anno') return data.slice(0,4) === new Date().getFullYear().toString();
-                      return true;
-                    })
+                  {filteredDdt
                     .map(d => (
                     <TableRow key={d.id} hover>
                       <TableCell>{d.numero_ddt || d.id}</TableCell>
                       <TableCell>{d.data_ddt}</TableCell>
                       <TableCell>{d.cliente_nome || d.cliente_id}</TableCell>
-                      <TableCell><Chip size="small" label={d.stato} sx={{ borderRadius: 0 }} /></TableCell>
+                      <TableCell>
+                        <Chip size="small" label={d.stato}
+                          sx={{ borderRadius: 0 }}
+                          color={d.stato==='da_fatturare' ? 'warning' : d.stato==='annullato' ? 'error' : 'success'}
+                        />
+                      </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <IconButton size="small" title="Stampa DDT" onClick={() => handleStampaDDT(d.id)}>
+                          <IconButton size="small" title="Stampa DDT" onClick={() => handleStampaDDT(d.id)} disabled={d.stato!=='da_fatturare'}>
                             <PrintIcon fontSize="small" />
                           </IconButton>
-                          <Button size="small" variant="outlined" onClick={()=>navigate(`/vendite/nuovo-ddt?id=${d.id}`)} sx={{ borderRadius:0 }}>Apri</Button>
+                          <Button size="small" variant="outlined" onClick={()=>navigate(`/vendite/nuovo-ddt?id=${d.id}`)} sx={{ borderRadius:0 }} disabled={d.stato!=='da_fatturare'}>Modifica</Button>
                           <IconButton size="small" title="Genera Fattura" onClick={() => handleGeneraFattura(d.id)} disabled={d.stato !== 'da_fatturare'}>
                             <ReceiptIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" title="Annulla DDT" onClick={() => handleAnnullaDDT(d.id)} disabled={d.stato !== 'da_fatturare'}>
+                            <CancelIcon fontSize="small" />
                           </IconButton>
                         </Stack>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                  </Table>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Stack spacing={1.25} sx={{ position: { md:'sticky' }, top: { md: 16 } }}>
+                    <StatCard title="DDT filtrati" value={filteredDdt.length} color={colors.sales} />
+                    <StatCard title="Da fatturare" value={filteredDdt.filter(x=>x.stato==='da_fatturare').length} color="#0ea5e9" />
+                    <StatCard title="Fatturati" value={filteredDdt.filter(x=>x.stato==='fatturato').length} color="#10b981" />
+                  </Stack>
+                </Grid>
+              </Grid>
             </Box>
           )}
           {tab === 2 && (
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: colors.text }}>Fatture vendita</Typography>
-              <Table size="small">
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={9}>
+                  <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>N.</TableCell>
@@ -517,43 +735,45 @@ export default function GestioneVendite() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {fatture
-                    .filter(f => (q==='' || String(f.numero_fattura||f.id).includes(q) || (f.cliente_nome||'').toLowerCase().includes(q.toLowerCase())))
-                    .filter(f => (!clienteFiltro || f.cliente_id===clienteFiltro.id))
-                    .filter(f => (!statoFiltro || f.stato===statoFiltro))
-                    .filter(f => {
-                      const data = f.data_fattura;
-                      if (dataDa && data < dataDa) return false;
-                      if (dataA && data > dataA) return false;
-                      if (periodo==='oggi') return data === new Date().toISOString().slice(0,10);
-                      if (periodo==='settimana') {
-                        const today = new Date();
-                        const start = new Date(today); start.setDate(today.getDate()-6);
-                        return data >= start.toISOString().slice(0,10) && data <= today.toISOString().slice(0,10);
-                      }
-                      if (periodo==='mese') return data.slice(0,7) === new Date().toISOString().slice(0,7);
-                      if (periodo==='anno') return data.slice(0,4) === new Date().getFullYear().toString();
-                      return true;
-                    })
+                  {filteredFatture
                     .map(f => (
                     <TableRow key={f.id} hover>
                       <TableCell>{f.numero_fattura || f.id}</TableCell>
                       <TableCell>{f.data_fattura}</TableCell>
                       <TableCell>{f.cliente_nome || f.cliente_id}</TableCell>
                       <TableCell align="right">€ {Number(f.totale || 0).toFixed(2)}</TableCell>
-                      <TableCell><Chip size="small" label={f.stato} sx={{ borderRadius: 0 }} /></TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip size="small" label={f.stato}
+                            sx={{ borderRadius: 0 }}
+                            color={f.stato==='annullata' ? 'error' : f.stato==='pagata' ? 'success' : 'default'}
+                          />
+                          {f.tipo_fattura==='differita' && (
+                            <Chip size="small" label="Differita" color="info" variant="outlined" sx={{ borderRadius: 0 }} />
+                          )}
+                          {!!(f as any).trasmessa_ade_at && (
+                            <Chip size="small" label="Inviata ADE" color="success" variant="outlined" sx={{ borderRadius: 0 }} />
+                          )}
+                          {(!(f as any).trasmessa_ade_at && f.tipo_fattura==='immediata') && (
+                            <Chip size="small"
+                              label={((new Date().getTime() - new Date((f as any).created_at || f.data_fattura).getTime()) <= 48*3600*1000) ? 'Modificabile <48h' : 'Bloccata >48h'}
+                              color={((new Date().getTime() - new Date((f as any).created_at || f.data_fattura).getTime()) <= 48*3600*1000) ? 'warning' : 'default'}
+                              variant="outlined"
+                              sx={{ borderRadius: 0 }}
+                            />
+                          )}
+                        </Stack>
+                      </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <IconButton size="small" title="Registra Incasso" onClick={() => handleApriIncasso(f)}>
-                            <AddCardIcon fontSize="small" />
+                          <IconButton size="small" title="Stampa/PDF" onClick={() => handleStampaFattura(f.id)}>
+                            <PrintIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" title="PDF/Export" onClick={() => {
-                            const w = window.open('', '_blank');
-                            if (!w) return;
-                            w.document.write(`<html><head><title>Fattura ${f.numero_fattura||f.id}</title></head><body><h1>Fattura ${f.numero_fattura||f.id}</h1><p>Cliente: ${f.cliente_nome||f.cliente_id}</p><p>Data: ${f.data_fattura}</p><p>Totale: € ${Number(f.totale||0).toFixed(2)}</p><script>window.onload=()=>window.print()</script></body></html>`);
-                            w.document.close();
-                          }}>
-                            <SummarizeIcon fontSize="small" />
+                          <Button size="small" variant="outlined" onClick={()=>navigate(`/vendite/nuova-fattura?id=${f.id}`)} sx={{ borderRadius:0 }}
+                            disabled={f.tipo_fattura==='differita' || !!f.trasmessa_ade_at || ((new Date().getTime() - new Date(f.created_at || f.data_fattura).getTime()) > 48*3600*1000)}
+                          >Modifica</Button>
+                          <IconButton size="small" title="Registra Incasso" onClick={() => handleApriIncasso(f)} disabled={f.stato==='annullata'}>
+                            <AddCardIcon fontSize="small" />
                           </IconButton>
                           <IconButton size="small" title="Invia Email" onClick={() => {
                             const subject = encodeURIComponent(`Fattura ${f.numero_fattura||f.id}`);
@@ -562,15 +782,27 @@ export default function GestioneVendite() {
                           }}>
                             <EmailIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" title="Elimina" onClick={() => handleEliminaFattura(f.id)}>
-                            <DeleteIcon fontSize="small" />
+                          <IconButton size="small" title="Annulla Fattura" onClick={() => handleAnnullaFattura(f)}
+                            disabled={f.stato==='annullata' || f.tipo_fattura==='differita' || !!f.trasmessa_ade_at || ((new Date().getTime() - new Date(f.created_at || f.data_fattura).getTime()) > 48*3600*1000)}
+                          >
+                            <CancelIcon fontSize="small" />
                           </IconButton>
+                          {/* Rimosso Elimina su richiesta: si utilizza solo Annulla */}
                         </Stack>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                  </Table>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Stack spacing={1.25} sx={{ position: { md:'sticky' }, top: { md: 16 } }}>
+                    <StatCard title="Fatture filtrate" value={filteredFatture.length} color={colors.sales} />
+                    <StatCard title="Totale (filtrate)" value={formatEuro(filteredFatture.reduce((s,f)=>s+Number(f.totale||0),0))} color="#10b981" />
+                    <StatCard title="Residuo (filtrate)" value={formatEuro(filteredFatture.reduce((s,f)=> s + (scadMap.get(f.id)?.residuo || 0), 0))} color="#ef4444" />
+                  </Stack>
+                </Grid>
+              </Grid>
             </Box>
           )}
           {tab === 3 && (
