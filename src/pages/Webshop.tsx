@@ -60,7 +60,7 @@ export default function Webshop() {
         <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'grey.200' }}>
           <Typography variant="h6">Webshop • Impostazioni</Typography>
           <Typography variant="body2" sx={{ color: 'grey.600' }}>Caricamento…</Typography>
-        </Paper>
+          </Paper>
       </Box>
     );
   }
@@ -72,19 +72,19 @@ export default function Webshop() {
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Webshop • Impostazioni Next.js</Typography>
             <Typography variant="body2" sx={{ color: 'grey.600' }}>Controlla stato online, URL e preferenze di accesso</Typography>
-          </Box>
+        </Box>
           <Stack direction="row" gap={1}>
             {settings.base_url && settings.is_online && (
               <Button variant="outlined" onClick={() => window.open(settings.base_url as string, '_blank')}>Apri Webshop</Button>
             )}
             <Button variant="contained" onClick={save} disabled={saving}>{saving ? 'Salvataggio…' : 'Salva'}</Button>
-          </Stack>
-        </Stack>
+                    </Stack>
+                    </Stack>
       </Paper>
 
       <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'grey.200', mb: 2 }}>
         <Stack spacing={2}>
-          <FormControlLabel
+                          <FormControlLabel
             control={<Switch checked={settings.is_online} onChange={(e) => setSettings(s => s ? ({ ...s, is_online: e.target.checked }) : s)} />}
             label="Webshop online"
           />
@@ -98,8 +98,8 @@ export default function Webshop() {
                 <MenuItem value="L1">L1</MenuItem>
                 <MenuItem value="L2">L2</MenuItem>
                 <MenuItem value="L3">L3</MenuItem>
-              </Select>
-            </FormControl>
+                </Select>
+              </FormControl>
             <FormControlLabel
               control={<Switch checked={settings.allow_guest} onChange={(e) => setSettings(s => s ? ({ ...s, allow_guest: e.target.checked }) : s)} />}
               label="Consenti navigazione ospite (senza login)"
@@ -119,12 +119,12 @@ export default function Webshop() {
         <Typography variant="subtitle2" sx={{ mb: 1 }}>Istruzioni deploy Next.js</Typography>
         <Typography variant="body2" sx={{ color: 'grey.700' }}>
           1) Crea un progetto Next.js su Vercel collegando Supabase. 2) Imposta l'URL qui sopra. 3) Metti online con il toggle. 4) Questo gestionale controllerà tema e accesso.
-        </Typography>
+                    </Typography>
         <Divider sx={{ my: 2 }} />
         <Typography variant="body2" sx={{ color: 'grey.600' }}>
           Nota: il listino di default e il tema verranno letti dal tuo sito Next.js tramite Supabase, per mostrare prezzi e stile coerenti.
-        </Typography>
-      </Paper>
+              </Typography>
+            </Paper>
 
       <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar(s => ({ ...s, open: false }))}>
         <Alert severity={snackbar.severity} onClose={() => setSnackbar(s => ({ ...s, open: false }))}>{snackbar.message}</Alert>

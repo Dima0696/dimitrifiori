@@ -3220,8 +3220,8 @@ export default function InserimentoFattureMultiRiga({
             <Box sx={{ display:'flex', alignItems:'center', justifyContent:'flex-start', mb: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: modernStyles.colors.text, fontSize:'1rem' }}>
                 Fatture di Acquisto ({fattureFiltrate.length} / {fattureEsistenti.length})
-              </Typography>
-            </Box>
+            </Typography>
+          </Box>
 
             {/* Filtri compatti inline */}
             <Box sx={{ display:'flex', gap:1, alignItems:'center', flexWrap:'nowrap', overflowX:'auto', '::-webkit-scrollbar':{ display:'none' }, mb: 1 }}>
@@ -3229,7 +3229,7 @@ export default function InserimentoFattureMultiRiga({
               {/* Fornitore da lista */}
               <FormControl size="small" sx={{ width: 240 }}>
                 <InputLabel>Fornitore</InputLabel>
-                <Select
+                    <Select
                   label="Fornitore"
                   value={filtri.fornitore}
                   onChange={(e)=>setFiltri({...filtri, fornitore:String(e.target.value)})}
@@ -3240,8 +3240,8 @@ export default function InserimentoFattureMultiRiga({
                       {f.ragione_sociale || f.nome}
                     </MenuItem>
                   ))}
-                </Select>
-              </FormControl>
+                    </Select>
+                  </FormControl>
               <TextField size="small" type="date" label="Da" value={filtri.dataInizio} onChange={(e)=>setFiltri({...filtri, dataInizio:e.target.value})} InputLabelProps={{ shrink:true }} sx={{ width: 150 }} />
               <TextField size="small" type="date" label="A" value={filtri.dataFine} onChange={(e)=>setFiltri({...filtri, dataFine:e.target.value})} InputLabelProps={{ shrink:true }} sx={{ width: 150 }} />
               {/* Stato non rilevante qui: rimosso dai filtri UI */}
@@ -3254,15 +3254,15 @@ export default function InserimentoFattureMultiRiga({
                   <MenuItem value="numero_fattura-desc">Numero (Z-A)</MenuItem>
                   <MenuItem value="totale-desc">Importo (maggiore)</MenuItem>
                   <MenuItem value="totale-asc">Importo (minore)</MenuItem>
-                </Select>
-              </FormControl>
+                    </Select>
+                  </FormControl>
               {/* Pulsanti azione inline */}
               <Button size="small" variant="outlined" onClick={resetFiltri} sx={{ borderRadius: 0, whiteSpace:'nowrap' }}>Reset</Button>
               <Button size="small" variant="outlined" onClick={loadData} sx={{ borderRadius: 0, whiteSpace:'nowrap' }}>Aggiorna</Button>
               <Button size="small" variant="outlined" onClick={exportCsv} sx={{ borderRadius: 0, whiteSpace:'nowrap' }}>Export CSV</Button>
             </Box>
 
-            {fattureFiltrate.length === 0 ? (
+          {fattureFiltrate.length === 0 ? (
               <Alert severity="info" sx={{ borderRadius: '8px' }}>Nessun documento trovato</Alert>
             ) : (
               <Table size="small">
@@ -3305,9 +3305,9 @@ export default function InserimentoFattureMultiRiga({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
       style={{
         minHeight: open ? '100vh' : 'fit-content',
@@ -3316,14 +3316,14 @@ export default function InserimentoFattureMultiRiga({
     >
       {/* 🔥 INDICATORE VISIVO MODALITÀ */}
       {!soloOrdini && (
-        <Box sx={{
+                        <Box sx={{ 
           position: 'sticky',
           top: 0,
           zIndex: 1000,
           background: modernStyles.colors.headerBg,
           borderBottom: `3px solid ${modalitaOrdini ? '#d97706' : '#1d4ed8'}`,
-          mb: 3
-        }}>
+                          mb: 3
+                        }}>
           <Box sx={{
             display: 'flex',
             alignItems: 'center',
@@ -3336,7 +3336,7 @@ export default function InserimentoFattureMultiRiga({
               animate={{ scale: 1 }}
               transition={{ duration: 0.3 }}
             >
-              <Chip
+                          <Chip 
                 icon={modalitaOrdini ? 
                   <Box sx={{ fontSize: '18px' }}>🛒</Box> : 
                   <Box sx={{ fontSize: '18px' }}>📋</Box>
@@ -3344,8 +3344,8 @@ export default function InserimentoFattureMultiRiga({
                 label={modalitaOrdini ? 
                   "MODALITÀ ORDINI ACQUISTO" : 
                   "MODALITÀ FATTURE DI ACQUISTO"
-                }
-                sx={{
+                            }
+                            sx={{ 
                   fontSize: '16px',
                   fontWeight: 'bold',
                   color: 'white',
@@ -3363,8 +3363,8 @@ export default function InserimentoFattureMultiRiga({
                 variant="filled"
               />
             </motion.div>
-          </Box>
-        </Box>
+                        </Box>
+                        </Box>
       )}
 
       {/* Sezione principale - nascosta quando soloOrdini è true */}
@@ -3424,7 +3424,7 @@ export default function InserimentoFattureMultiRiga({
                         <Box sx={{ fontSize: '16px' }}>📋</Box> : 
                         <Box sx={{ fontSize: '16px' }}>🛒</Box>
                       }
-                      sx={{ 
+                  sx={{ 
                         borderRadius: '25px',
                         padding: '10px 20px',
                         background: modalitaOrdini ? 'linear-gradient(45deg, #667eea, #764ba2)' : 'linear-gradient(45deg, #f59e0b, #fb923c)',
