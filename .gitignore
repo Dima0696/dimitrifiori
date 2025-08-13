@@ -29,17 +29,6 @@ dist-ssr
 *.sw?
 
 # File obsoleti che si rigenerano automaticamente - IGNORALI
-src/components/ListaClienti.tsx
-src/components/GestioneFornitori.tsx
-src/components/GestioneFattureVendita.tsx
-src/components/GestioneProdotti.tsx
-src/components/GestioneVarieta.tsx
-src/components/InserimentoFattura.tsx
-src/components/MovimentiMagazzino.tsx
-src/components/PDFParsingInterattivo.tsx
-src/components/Statistiche.tsx
-src/components/StatisticheFattureAcquisto.tsx
-src/components/StatisticheVendite.tsx
 
 # File di migrazione temporanei
 ANALISI_*.md
