@@ -51,7 +51,7 @@ export default function Sidebar({ mobileOpen, onDrawerToggle }: { mobileOpen?: b
     { label: 'Gestione Acquisti', icon: <ShoppingCartIcon />, path: '/acquisti' },
     { label: 'Gestione Vendite', icon: <PointOfSaleIcon />, path: '/vendite' },
     { label: 'Gestione Fornitori', icon: <BusinessIcon />, path: '/fornitori' },
-    { label: 'Lista Clienti', icon: <PeopleIcon />, path: '/clienti' },
+    { label: 'Gestione Clienti', icon: <PeopleIcon />, path: '/clienti' },
     { label: 'Anagrafica', icon: <SettingsIcon />, path: '/anagrafica' },
     { label: 'Statistiche', icon: <AnalyticsIcon />, path: '/statistiche' },
     { label: 'Contabilità', icon: <AccountBalanceIcon />, path: '/contabilita' },

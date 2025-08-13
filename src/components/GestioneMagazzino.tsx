@@ -16,6 +16,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import InserimentoFattureMultiRiga from './magazzino/InserimentoFattureMultiRiga';
 import GiacenzeMagazzino from './magazzino/GiacenzeMagazzino';
 import { MovimentiMagazzino } from './ListaDocumentiCarico';
+import LogMovimenti from './magazzino/LogMovimenti';
 
 
 
@@ -145,27 +146,10 @@ export default function GestioneMagazzino() {
   ];
 
   const tabs = [
-    {
-      label: 'Fatture Acquisti',
-      icon: <ReceiptLongIcon />,
-      color: modernColors.accent1,
-      bgColor: `${modernColors.accent1}14`,
-      borderColor: `${modernColors.accent1}55`,
-    },
-    {
-      label: 'Giacenze',
-      icon: <InventoryIcon />,
-      color: modernColors.accent2,
-      bgColor: `${modernColors.accent2}14`,
-      borderColor: `${modernColors.accent2}55`,
-    },
-    {
-      label: 'Movimenti',
-      icon: <AssessmentIcon />,
-      color: modernColors.accent4,
-      bgColor: `${modernColors.accent4}0F`,
-      borderColor: `${modernColors.accent4}55`,
-    },
+    { label: 'Fatture Acquisti', icon: <ReceiptLongIcon />, color: modernColors.accent1, bgColor: `${modernColors.accent1}14`, borderColor: `${modernColors.accent1}55` },
+    { label: 'Giacenze', icon: <InventoryIcon />, color: modernColors.accent2, bgColor: `${modernColors.accent2}14`, borderColor: `${modernColors.accent2}55` },
+    { label: 'Movimenti', icon: <AssessmentIcon />, color: modernColors.accent4, bgColor: `${modernColors.accent4}0F`, borderColor: `${modernColors.accent4}55` },
+    { label: 'Log movimenti', icon: <AssessmentIcon />, color: modernColors.accent4, bgColor: `${modernColors.accent4}0F`, borderColor: `${modernColors.accent4}55` },
   ];
 
   return (
@@ -411,9 +395,21 @@ export default function GestioneMagazzino() {
                   boxShadow: `0 2px 8px ${tabs[tabValue]?.color || modernColors.primary}30`,
                 }
               }}>
-                {tabValue === 0 && <InserimentoFattureMultiRiga />}
+                {tabValue === 0 && (
+                  <Box sx={{ p: 0 }}>
+                    {/* Toolbar compatta per Fatture Acquisti */}
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 2, flexWrap: 'nowrap', overflowX: 'auto', '::-webkit-scrollbar': { display: 'none' } }}>
+                      {/* Nota: il componente InserimentoFattureMultiRiga gestisce la creazione. Qui mostriamo solo la lista coerente alle vendite */}
+                      {/* Placeholder controlli: la pagina acquisti usa già GestioneAcquisti per CRUD completo */}
+                      <Typography variant="body2" sx={{ color: modernColors.textSecondary, whiteSpace:'nowrap' }}>Fatture acquisto recenti</Typography>
+                    </Box>
+                    {/* Per performance e coerenza con vendite, invitiamo a usare GestioneAcquisti che ha tabella compatta */}
+                    <InserimentoFattureMultiRiga />
+                  </Box>
+                )}
                 {tabValue === 1 && <GiacenzeMagazzino />}
                 {tabValue === 2 && <MovimentiMagazzino />}
+                {tabValue === 3 && <LogMovimenti />}
               </Box>
             </motion.div>
           </AnimatePresence>

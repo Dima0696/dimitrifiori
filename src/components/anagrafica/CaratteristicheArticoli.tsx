@@ -66,7 +66,7 @@ const CaratteristicheArticoli: React.FC = () => {
             fontWeight: 500,
             color: 'grey.800',
             mb: 1,
-            background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+            background: 'linear-gradient(45deg, #111827 30%, #6b7280 90%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text'
@@ -89,7 +89,7 @@ const CaratteristicheArticoli: React.FC = () => {
         </Typography>
       </Box>
 
-      <Paper 
+        <Paper 
         elevation={0}
         sx={{ 
           width: '100%',
@@ -111,21 +111,21 @@ const CaratteristicheArticoli: React.FC = () => {
               '& .MuiTabs-indicator': {
                 height: 2,
                 borderRadius: 0,
-                background: '#4caf50',
+                background: '#111827',
               },
               '& .MuiTab-root': {
                 minHeight: 64,
                 textTransform: 'none',
                 fontWeight: 500,
                 fontSize: '0.9rem',
-                color: 'grey.600',
+                color: '#6b7280',
                 '&:hover': {
-                  color: 'success.main',
-                  background: 'rgba(76, 175, 80, 0.04)',
+                  color: '#111827',
+                  background: 'rgba(17, 24, 39, 0.06)',
                 },
                 '&.Mui-selected': {
-                  color: 'success.main',
-                  fontWeight: 600,
+                  color: '#111827',
+                  fontWeight: 700,
                   bgcolor: 'rgba(255, 255, 255, 0.8)',
                 },
               },

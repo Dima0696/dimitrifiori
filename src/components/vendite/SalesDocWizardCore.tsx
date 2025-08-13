@@ -44,6 +44,9 @@ type RigaUI = {
   sconto: string;
   iva: string;
   imballoQuant?: number;
+  // Metadati per modifiche: servono per consentire reintegro dal lotto originale
+  originaleQuantita?: number;
+  originalDocumentoCaricoId?: number;
 };
 
 export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; existing?: { id: number; ddt?: any; righe?: any[]; fattura?: any } }) {
@@ -89,6 +92,21 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
       apiService.getGiacenzeMagazzino()
     ]).then(([cl, gz])=>{ setClienti(cl); setGiacenze(gz); }).catch(e=>setError(e.message||'Errore caricamento dati'));
   },[]);
+
+  // Flag stato documento per banner e readonly
+  const isFattura = mode === 'fattura';
+  const f: any = existing?.fattura || null;
+  const d: any = existing?.ddt || null;
+  const annullato = isFattura ? (f?.stato === 'annullata') : (d?.stato === 'annullato');
+  const differita = isFattura && f?.tipo_fattura === 'differita';
+  const inviataADE = isFattura && !!f?.trasmessa_ade_at;
+  const oltre48h = isFattura && f?.tipo_fattura === 'immediata' && (() => {
+    try {
+      const created = new Date(f?.created_at || f?.data_fattura).getTime();
+      return (Date.now() - created) > (48*3600*1000);
+    } catch { return false; }
+  })();
+  const readOnly = !!(annullato || differita || inviataADE || oltre48h);
 
   // Prefill in modalità modifica DDT
   React.useEffect(()=>{
@@ -144,7 +162,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
         iQty = new Map(imballi.map((x:any)=>[x.id, x.quantita || x.qta || 1]));
       } catch {}
 
-      const rows = (existing.righe || []).map((r: any) => {
+      const rawRows = (existing.righe || []).map((r: any) => {
         let match = giacenze.find((g: any) => g.articolo_id === r.articolo_id) || null;
         if (!match) {
           // Fallback sintetico per visualizzazione/modifica
@@ -156,6 +174,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
             imballo_id: r.imballo_id,
             altezza_id: r.altezza_id,
             qualita_id: r.qualita_id,
+            carico_id: r.documento_carico_id || null,
             gruppo_nome: gMap.get(r.gruppo_id) || '',
             prodotto_nome: pMap.get(r.prodotto_id) || '',
             colore_nome: cMap.get(r.colore_id) || '',
@@ -174,9 +193,18 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
           prezzo: String(prezzoBase || 0),
           sconto: String(r.sconto_percentuale ?? 0),
           iva: String(r.iva_percentuale ?? 10),
-          imballoQuant: imballo
+          imballoQuant: imballo,
+          originaleQuantita: Number(r.quantita || 0),
+          originalDocumentoCaricoId: Number(r.documento_carico_id || 0)
         } as RigaUI;
       });
+      // Dedupe: una sola riga per documento_carico_id (o articolo)
+      const map = new Map<string, RigaUI>();
+      rawRows.forEach((rw, idx) => {
+        const key = String(rw.giacenza?.carico_id ?? `art-${rw.giacenza?.articolo_id ?? idx}`);
+        map.set(key, rw); // mantiene l'ultima occorrenza
+      });
+      const rows = Array.from(map.values());
       if (rows.length) setRighe(rows);
     })();
   }, [giacenze, existing, mode]);
@@ -188,22 +216,49 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
     if (found) setCliente(found);
   }, [clienti, existing, mode]);
 
-  // Righe precompilate quando ho giacenze caricate
+  // Righe precompilate quando ho giacenze caricate (DDT)
   React.useEffect(()=>{
     if (mode !== 'ddt' || !existing?.righe) return;
-    const rows = (existing.righe || []).map((r: any) => {
-      const match = giacenze.find((g: any) => g.articolo_id === r.articolo_id) || null;
+    const rawRows = (existing.righe || []).map((r: any) => {
+      let match = giacenze.find((g: any) => g.articolo_id === r.articolo_id) || null;
+      if (!match) {
+        match = {
+          articolo_id: r.articolo_id,
+          gruppo_id: r.gruppo_id,
+          prodotto_id: r.prodotto_id,
+          colore_id: r.colore_id,
+          imballo_id: r.imballo_id,
+          altezza_id: r.altezza_id,
+          qualita_id: r.qualita_id,
+          carico_id: r.documento_carico_id || null,
+          gruppo_nome: '',
+          prodotto_nome: '',
+          colore_nome: '',
+          imballo_nome: '',
+          altezza_cm: '',
+          imballo_quantita: 1,
+          quantita_giacenza: 0
+        } as any;
+      }
       const imballo = Number(match?.imballo_quantita || 1);
       return {
         giacenza: match,
         quantita: String(r.quantita || imballo),
         livello: 'L1' as const,
-        prezzo: String(r.prezzo_unitario ?? r.prezzo_finale ?? 0),
+        prezzo: String(r.prezzo_unitario ?? r.prezo_finale ?? r.prezzo_finale ?? 0),
         sconto: '0',
         iva: String(r.iva_percentuale ?? 10),
-        imballoQuant: imballo
-      };
+        imballoQuant: imballo,
+        originaleQuantita: Number(r.quantita || 0),
+        originalDocumentoCaricoId: Number(r.documento_carico_id || 0)
+      } as RigaUI;
     });
+    const map = new Map<string, RigaUI>();
+    rawRows.forEach((rw, idx) => {
+      const key = String(rw.giacenza?.carico_id ?? `art-${rw.giacenza?.articolo_id ?? idx}`);
+      map.set(key, rw);
+    });
+    const rows = Array.from(map.values());
     if (rows.length) setRighe(rows);
   }, [giacenze, existing, mode]);
 
@@ -233,12 +288,23 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
   const addRiga = () => setRighe([...righe, { giacenza: null, quantita: '1', livello: 'L1', prezzo: '0', sconto: '0', iva: '10' }]);
   const removeRiga = (idx: number) => { const arr=[...righe]; arr.splice(idx,1); setRighe(arr); };
 
-  const isImballoInvalid = (r: RigaUI) => {
+  const getDisponibilitaEffettiva = (r: RigaUI) => {
     if (!r.giacenza) return true;
     const q = Number(r.quantita || 0);
     const imballo = Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1);
     const available = Number(r.giacenza?.quantita_giacenza || 0);
-    const exceeds = q > available;
+    const bonus = (r.originalDocumentoCaricoId && r.giacenza?.carico_id === r.originalDocumentoCaricoId) ? Number(r.originaleQuantita || 0) : 0;
+    const effective = available + bonus;
+    if (q <= 0 || q % imballo !== 0) return 0; // segnaliamo invalido tramite 0
+    return effective;
+  };
+  const isImballoInvalid = (r: RigaUI) => {
+    if (!r.giacenza) return true;
+    const q = Number(r.quantita || 0);
+    const imballo = Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1);
+    const effective = getDisponibilitaEffettiva(r);
+    if (effective === 0) return true;
+    const exceeds = q > effective;
     return q <= 0 || q % imballo !== 0 || exceeds;
   };
   const validRows = React.useMemo(() => righe.filter(r => !!r.giacenza && Number(r.quantita || 0) > 0), [righe]);
@@ -506,8 +572,18 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
     if (validRows.length === 0) { setError('Aggiungi almeno una riga valida'); return; }
     try {
       setSaving(true); setError(null);
+      // Normalizzazione: una sola riga per ciascun documento_carico_id (o articolo_id)
+      const normalizeRows = (rows: RigaUI[]) => {
+        const map = new Map<string, RigaUI>();
+        rows.forEach((r, idx) => {
+          const key = String(r.giacenza?.carico_id ?? `art-${r.giacenza?.articolo_id ?? idx}`);
+          map.set(key, r); // tiene l'ultima occorrenza (modifica), elimina duplicati
+        });
+        return Array.from(map.values());
+      };
+      const rowsForSave = normalizeRows(validRows);
       if (mode === 'ddt') {
-        const payload = validRows.map(r => ({
+        const payload = rowsForSave.map(r => ({
           quantita: Number(r.quantita||0),
           prezzo_unitario: Number(r.prezzo||0),
           prezzo_finale: Number(r.prezzo||0),
@@ -527,7 +603,11 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
             data_ddt: data,
             destinazione: destinazione || null,
             spedizioniere: spedizioniere || null,
-            note: note ? `${note} | Scadenza: ${dataScadenza}` : `Scadenza: ${dataScadenza}`
+            note: (() => {
+              const tag = `Scadenza: ${dataScadenza}`;
+              const base = note || '';
+              return base.includes('Scadenza:') ? base.replace(/Scadenza:[^|]*/g, tag) : (base ? `${base} | ${tag}` : tag);
+            })()
           } as any);
           await apiService.replaceDDTRighe(existing.id, payload as any);
           setSavedId(existing.id);
@@ -545,7 +625,7 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
           return newId;
         }
       } else {
-        const payload = validRows.map(r => ({
+        const payload = rowsForSave.map(r => ({
           quantita: Number(r.quantita||0),
           prezzo_unitario: Number(r.prezzo||0),
           prezzo_finale: Number(r.prezzo||0),
@@ -567,9 +647,14 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
             imponibile,
             iva: totaleIva,
             totale,
-            note: metodoPagamento==='nessuno'
-              ? (note || '')
-              : (note ? `${note} | Metodo: ${metodoPagamento}` : `Metodo: ${metodoPagamento}`),
+            note: (() => {
+              const tag = metodoPagamento==='nessuno' ? null : `Metodo: ${metodoPagamento}`;
+              let base = note || '';
+              if (tag) {
+                base = base.includes('Metodo:') ? base.replace(/Metodo:[^|]*/g, tag) : (base ? `${base} | ${tag}` : tag);
+              }
+              return base;
+            })(),
           } as any);
           await apiService.replaceFatturaRighe(existing.id, payload as any);
           setSavedId(existing.id);
@@ -582,9 +667,10 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
             imponibile,
             iva: totaleIva,
             totale,
-            note: metodoPagamento==='nessuno'
-              ? (note || '')
-              : (note ? `${note} | Metodo: ${metodoPagamento}` : `Metodo: ${metodoPagamento}`),
+            note: (() => {
+              const tag = metodoPagamento==='nessuno' ? null : `Metodo: ${metodoPagamento}`;
+              return tag ? (note ? `${note} | ${tag}` : tag) : (note || '');
+            })(),
           } as any, payload as any);
           setSavedId(newId);
           return newId;
@@ -776,6 +862,21 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
         </Typography>
         
       </Box>
+      {/* Banner stato documento */}
+      {existing?.id && annullato && (
+        <Paper variant="outlined" sx={{ p:1.5, mb:2, borderRadius:0, borderColor:'#ef4444', background:'#fef2f2' }}>
+          <Typography variant="body2" sx={{ fontWeight:700, color:'#b91c1c' }}>Documento annullato</Typography>
+          <Typography variant="caption" sx={{ color:'#7f1d1d' }}>Questo documento è in sola lettura. Le modifiche non sono consentite.</Typography>
+        </Paper>
+      )}
+      {existing?.id && !annullato && readOnly && (
+        <Paper variant="outlined" sx={{ p:1.5, mb:2, borderRadius:0, borderColor:'#f59e0b', background:'#fffbeb' }}>
+          <Typography variant="body2" sx={{ fontWeight:700, color:'#92400e' }}>
+            {differita ? 'Fattura differita non modificabile' : inviataADE ? 'Fattura inviata ad ADE: blocco modifiche' : 'Blocco modifiche > 48h'}
+          </Typography>
+          <Typography variant="caption" sx={{ color:'#7c2d12' }}>Non è possibile modificare questo documento.</Typography>
+        </Paper>
+      )}
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 0 }}>
         <Stepper activeStep={active} alternativeLabel>
           {steps.map(s => (<Step key={s}><StepLabel>{s}</StepLabel></Step>))}
@@ -860,11 +961,16 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
                   renderInput={(p)=><TextField {...p} label="Articolo (da giacenze reali)" />} />
               </Grid>
               <Grid item xs={6} md={1.5 as any}>
-                <TextField label="Qta" type="number" value={r.quantita}
+                  <TextField label="Qta" type="number" value={r.quantita}
                   onChange={e=>{ const arr=[...righe]; arr[idx]={...arr[idx], quantita:e.target.value}; setRighe(arr);} }
                   inputProps={{ min: r.imballoQuant || r.giacenza?.imballo_quantita || 1, step: r.imballoQuant || r.giacenza?.imballo_quantita || 1 }}
-                  error={!!r.giacenza && (Number(r.quantita||0) % Number(r.imballoQuant || r.giacenza?.imballo_quantita || 1) !== 0 || Number(r.quantita||0) > Number(r.giacenza?.quantita_giacenza || 0))}
-                  helperText={r.giacenza ? `Imballo: ${r.imballoQuant || r.giacenza?.imballo_quantita || 1} • Disponibile: ${r.giacenza?.quantita_giacenza ?? 0}` : ''}
+                   error={!!r.giacenza && isImballoInvalid(r)}
+                   helperText={r.giacenza ? (()=>{
+                     const base = Number(r.giacenza?.quantita_giacenza || 0);
+                     const bonus = (r.originalDocumentoCaricoId && r.giacenza?.carico_id === r.originalDocumentoCaricoId) ? Number(r.originaleQuantita || 0) : 0;
+                     const eff = base + bonus;
+                     return `Imballo: ${r.imballoQuant || r.giacenza?.imballo_quantita || 1} • Disponibile: ${eff}${bonus?` (base ${base} + vecchia riga ${bonus})`:''}`;
+                   })() : ''}
                   sx={fieldSx}
                 />
               </Grid>
@@ -993,20 +1099,20 @@ export default function SalesDocWizardCore({ mode, existing }: { mode: Mode; exi
         </Stack>
         <Stack direction="row" spacing={1}>
           {active < steps.length-1 && (
-            <Button variant="contained" onClick={()=>setActive(active+1)} disabled={(active===0 && !cliente) || (active===1 && !canProceed)} sx={{ borderRadius: 0 }}>Avanti</Button>
+            <Button variant="contained" onClick={()=>setActive(active+1)} disabled={readOnly || (active===0 && !cliente) || (active===1 && !canProceed)} sx={{ borderRadius: 0 }}>Avanti</Button>
           )}
           {active === steps.length-1 && (
             <>
-              <Button variant="contained" onClick={async()=>{ const id = await saveOrUpdateAndReturnId(); if (id) setSavedId(id); }} disabled={saving || !canProceed} sx={{ borderRadius: 0 }}>
+              <Button variant="contained" onClick={async()=>{ const id = await saveOrUpdateAndReturnId(); if (id) { setSavedId(id); safeBack(navigate, '/vendite'); } }} disabled={readOnly || saving || !canProceed} sx={{ borderRadius: 0 }}>
                 Salva
               </Button>
-              <Button variant="outlined" onClick={async()=>{ const id = existing?.id || await saveOrUpdateAndReturnId(); if (!id) return; if (mode==='fattura') await stampaFatturaById(id); else await stampaDDTById(id); }} disabled={saving || !canProceed} sx={{ borderRadius: 0 }}>
+              <Button variant="outlined" onClick={async()=>{ const id = existing?.id || await saveOrUpdateAndReturnId(); if (!id) return; if (mode==='fattura') await stampaFatturaById(id); else await stampaDDTById(id); }} disabled={readOnly || saving || !canProceed} sx={{ borderRadius: 0 }}>
                 Stampa
               </Button>
-              <Button variant="outlined" color="success" startIcon={<WhatsAppIcon />} onClick={handleShareWhatsAppPdf} disabled={saving || !canProceed} sx={{ borderRadius: 0 }}>
+              <Button variant="outlined" color="success" startIcon={<WhatsAppIcon />} onClick={handleShareWhatsAppPdf} disabled={readOnly || saving || !canProceed} sx={{ borderRadius: 0 }}>
                 WhatsApp
               </Button>
-              <Button variant="outlined" startIcon={<ShareIcon />} onClick={handleShare} sx={{ borderRadius: 0 }}>
+              <Button variant="outlined" startIcon={<ShareIcon />} onClick={handleShare} disabled={readOnly} sx={{ borderRadius: 0 }}>
                 Condividi
               </Button>
               <Button variant="outlined" startIcon={<ContentCopyIcon />} onClick={handleCopyRecap} sx={{ borderRadius: 0 }}>

@@ -105,6 +105,12 @@ const GestioneClienti: React.FC = () => {
     });
   }, [clienti, searchTerm, tipoFilter, statoFilter]);
 
+  const kpi = {
+    totale: clienti.length,
+    attivi: clienti.filter(c => c.attivo).length,
+    inattivi: clienti.filter(c => !c.attivo).length,
+  };
+
   useEffect(() => {
     loadClienti();
   }, []);
@@ -217,33 +223,66 @@ const GestioneClienti: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ mb: 4, textAlign: 'center' }}>
-        <Typography 
-          variant="h5" 
-          sx={{ 
+    <Box sx={{ maxWidth: 1400, mx: 'auto', p: 2 }}>
+      {/* KPI e azioni in alto */}
+      <Grid container spacing={2} mb={2}>
+        {[{
+          label: 'Totale Clienti',
+          value: kpi.totale,
+          color: '#7c3aed',
+          bg: '#ede9fe'
+        }, {
+          label: 'Clienti Attivi',
+          value: kpi.attivi,
+          color: '#22c55e',
+          bg: '#ecfdf5'
+        }, {
+          label: 'Clienti Inattivi',
+          value: kpi.inattivi,
+          color: '#ef4444',
+          bg: '#fef2f2'
+        }].map((card, idx) => (
+          <Grid item xs={12} sm={4} key={idx}>
+            <Box sx={{
+              p: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.200',
+              background: card.bg,
+            }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: card.color }}>
+                {card.value}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'grey.700', fontWeight: 500 }}>
+                {card.label}
+              </Typography>
+            </Box>
+          </Grid>
+        ))}
+      </Grid>
+
+      <Box display="flex" justifyContent="flex-end" alignItems="center" mb={2}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog()}
+          sx={{
+            borderRadius: 2,
+            textTransform: 'none',
             fontWeight: 500,
-            color: 'grey.800',
-            mb: 1,
-            background: 'linear-gradient(45deg, #9c27b0 30%, #ba68c8 90%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
+            background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+            boxShadow: '0 6px 16px rgba(124, 58, 237, 0.3)',
+            '&:hover': {
+              background: 'linear-gradient(90deg, #6d28d9, #8b5cf6)',
+              boxShadow: '0 8px 20px rgba(124, 58, 237, 0.4)',
+            }
           }}
         >
-          Gestione Clienti
-        </Typography>
-        
-        <Typography 
-          variant="body2" 
-          sx={{ 
-          color: 'grey.600',
-          mb: 2
-        }}
-      >
-        {clientiFiltered.length} clienti {clienti.length !== clientiFiltered.length && `(su ${clienti.length} totali)`}
-      </Typography>
-    </Box>    {/* Search and Filter Section */}
+          Nuovo Cliente
+        </Button>
+      </Box>
+
+      {/* Search and Filter Section */}
     <Paper 
       sx={{ 
         p: 3, 
@@ -291,7 +330,7 @@ const GestioneClienti: React.FC = () => {
         />
 
         {/* Filters Row */}
-        <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Tipo Cliente Filter */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <FilterIcon sx={{ color: 'grey.600', fontSize: '1.2rem' }} />
@@ -311,10 +350,10 @@ const GestioneClienti: React.FC = () => {
                   px: 2,
                   py: 0.5,
                   '&.Mui-selected': {
-                    backgroundColor: '#9c27b0',
+                    backgroundColor: '#7c3aed',
                     color: 'white',
                     '&:hover': {
-                      backgroundColor: '#7b1fa2'
+                      backgroundColor: '#6d28d9'
                     }
                   }
                 }
@@ -355,26 +394,9 @@ const GestioneClienti: React.FC = () => {
           </Box>
         </Box>
       </Box>
-    </Paper>
 
-    <Box display="flex" justifyContent="flex-end" alignItems="center" mb={3}>
-      <Button
-        variant="contained"
-        startIcon={<AddIcon />}
-        onClick={() => handleOpenDialog()}
-        sx={{
-          borderRadius: 2,
-          textTransform: 'none',
-          fontWeight: 500,
-          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
-          '&:hover': {
-            boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
-          }
-        }}
-      >
-        Nuovo Cliente
-      </Button>
-    </Box>
+      {/* KPI duplicati rimossi */}
+    </Paper>
 
       {error && (
         <Alert 
@@ -391,66 +413,62 @@ const GestioneClienti: React.FC = () => {
         </Alert>
       )}
 
-      {/* Cards per tipologia */}
-      <Grid container spacing={3} mb={4}>
+      {/* Tipologie Clienti: 6 colonne su una sola riga */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 2, mb: 4 }}>
         {tipoClienteOptions.map((tipo) => {
           const count = clientiByTipo[tipo.value]?.length || 0;
           return (
-            <Grid item xs={12} sm={6} md={4} lg={2} key={tipo.value}>
-              <Card 
-                elevation={0}
-                sx={{ 
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: 'grey.200',
-                  transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                  }
-                }}
-              >
-                <CardContent sx={{ p: 3 }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <Box 
-                      sx={{ 
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: `${tipo.color}.50`,
-                        color: `${tipo.color}.main`,
-                        display: 'flex'
-                      }}
+            <Card 
+              key={tipo.value}
+              elevation={0}
+              onClick={() => setTipoFilter(tipo.value)}
+              sx={{ 
+                cursor: 'pointer',
+                width: '100%',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'grey.200',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }
+              }}
+            >
+              <CardContent sx={{ p: 3 }}>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Box 
+                    sx={{ 
+                      p: 1.5,
+                      borderRadius: 2,
+                      bgcolor: `${tipo.color}.50`,
+                      color: `${tipo.color}.main`,
+                      display: 'flex'
+                    }}
+                  >
+                    {tipo.icon}
+                  </Box>
+                  <Box>
+                    <Typography 
+                      variant="h5" 
+                      sx={{ fontWeight: 600, color: 'grey.800' }}
                     >
-                      {tipo.icon}
-                    </Box>
-                    <Box>
-                      <Typography 
-                        variant="h5" 
-                        sx={{ 
-                          fontWeight: 600,
-                          color: 'grey.800'
-                        }}
-                      >
-                        {count}
-                      </Typography>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          color: 'grey.600',
-                          fontSize: '0.85rem'
-                        }}
-                      >
-                        {tipo.label}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
+                      {count}
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ color: 'grey.600', fontSize: '0.85rem' }}
+                    >
+                      {tipo.label}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
           );
         })}
-      </Grid>
+      </Box>
 
       {/* Tabella clienti */}
       <Paper 

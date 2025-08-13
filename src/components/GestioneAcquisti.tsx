@@ -105,6 +105,24 @@ export default function GestioneAcquisti() {
     valoreOrdinato: ordini.filter(o => o.stato === 'ordinato').reduce((acc, o) => acc + o.totale_ordine, 0)
   };
 
+  // Export CSV ordini filtrati
+  const exportOrdiniCsv = () => {
+    const headers = ['numero_ordine','fornitore','data_ordine','consegna_prevista','stato','totale'];
+    const rows = ordiniFiltrati.map(o => [
+      o.numero_ordine,
+      o.fornitore_nome,
+      new Date(o.data_ordine).toISOString().slice(0,10),
+      new Date(o.data_consegna_prevista).toISOString().slice(0,10),
+      o.stato,
+      o.totale_ordine.toFixed(2)
+    ].join(','));
+    const csv = [headers.join(',')].concat(rows).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'ordini_acquisto.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
   // Ordini filtrati
   const ordiniFiltrati = ordini.filter(ordine => {
     const matchStato = !filtroStato || ordine.stato === filtroStato;
@@ -370,9 +388,11 @@ export default function GestioneAcquisti() {
 
   const modernStyles = {
     mainContainer: {
-      p: 3,
+      p: 2,
       background: `linear-gradient(135deg, ${alpha(modernColors.primary, 0.04)} 0%, ${alpha(modernColors.secondary, 0.02)} 100%)`,
-      minHeight: '100vh'
+      minHeight: '100vh',
+      maxWidth: 1400,
+      mx: 'auto'
     },
     statsCard: {
       borderRadius: 1, // Meno arrotondato
@@ -389,7 +409,7 @@ export default function GestioneAcquisti() {
     header: {
       background: `linear-gradient(135deg, ${modernColors.primary} 0%, ${modernColors.secondary} 100%)`,
       color: 'white',
-      p: 4,
+      p: 3,
       borderRadius: 0, // Completamente squadrato
       display: 'flex',
       alignItems: 'center',
@@ -497,88 +517,40 @@ export default function GestioneAcquisti() {
 
   const renderFiltri = () => (
     <Paper sx={modernStyles.filterCard}>
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h6" sx={{ mb: 3, color: modernColors.text, fontWeight: 600 }}>
-          🔍 Filtri e Azioni
-        </Typography>
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={3}>
-            <FormControl fullWidth>
-              <InputLabel sx={{ color: modernColors.textSecondary }}>Filtra per Stato</InputLabel>
-              <Select
-                value={filtroStato}
-                onChange={(e) => setFiltroStato(e.target.value)}
-                label="Filtra per Stato"
-                sx={{
-                  borderRadius: 1,
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: alpha(modernColors.primary, 0.2)
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: modernColors.primary
-                  }
-                }}
-              >
-                <MenuItem value="">🗂️ Tutti gli stati</MenuItem>
-                                 <MenuItem value="ordinato">🛒 Ordinato</MenuItem>
-                 <MenuItem value="consegnato">✅ Consegnato</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          
-          <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              label="Cerca Fornitore"
-              value={filtroFornitore}
-              onChange={(e) => setFiltroFornitore(e.target.value)}
-              InputProps={{
-                startAdornment: <SearchIcon sx={{ color: modernColors.primary, mr: 1 }} />
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 1,
-                  '& fieldset': {
-                    borderColor: alpha(modernColors.primary, 0.2)
-                  },
-                  '&:hover fieldset': {
-                    borderColor: modernColors.primary
-                  }
-                }
-              }}
-            />
-          </Grid>
-          
-          <Grid item xs={12} md={5}>
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                onClick={loadOrdiniAcquisto}
-                startIcon={<RefreshIcon />}
-                disabled={loading}
-                sx={{
-                  borderRadius: 1,
-                  borderColor: modernColors.primary,
-                  color: modernColors.primary,
-                  '&:hover': {
-                    borderColor: modernColors.secondary,
-                    backgroundColor: alpha(modernColors.primary, 0.05)
-                  }
-                }}
-              >
-                Aggiorna
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => setDialogNuovoOrdine(true)}
-                startIcon={<AddIcon />}
-                sx={modernStyles.primaryButton}
-              >
-                🛒 Nuovo Ordine
-              </Button>
-            </Box>
-          </Grid>
-        </Grid>
+      <Box sx={{ p: 2 }}>
+        <Box sx={{ display:'flex', gap:1, alignItems:'center', flexWrap:'nowrap', overflowX:'auto', '::-webkit-scrollbar':{ display:'none' } }}>
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel sx={{ color: modernColors.textSecondary }}>Stato</InputLabel>
+            <Select
+              value={filtroStato}
+              onChange={(e) => setFiltroStato(e.target.value)}
+              label="Stato"
+            >
+              <MenuItem value="">Tutti</MenuItem>
+              <MenuItem value="ordinato">Ordinato</MenuItem>
+              <MenuItem value="consegnato">Consegnato</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            size="small"
+            label="Fornitore"
+            value={filtroFornitore}
+            onChange={(e) => setFiltroFornitore(e.target.value)}
+            InputProps={{ startAdornment: <SearchIcon sx={{ color: modernColors.primary, mr: 1 }} /> }}
+            sx={{ minWidth: 220 }}
+          />
+          <Button size="small" variant="outlined" onClick={loadOrdiniAcquisto} startIcon={<RefreshIcon />} sx={{ borderRadius:0, whiteSpace:'nowrap' }} disabled={loading}>Aggiorna</Button>
+          <Button size="small" variant="outlined" onClick={exportOrdiniCsv} sx={{ borderRadius:0, whiteSpace:'nowrap' }}>Export CSV</Button>
+          <Button size="small" variant="contained" onClick={()=>setDialogNuovoOrdine(true)} startIcon={<AddIcon />} sx={{
+            borderRadius: 1,
+            px: 3,
+            py: 1,
+            fontWeight: 700,
+            textTransform: 'none',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #fb923c 100%)',
+            '&:hover': { background: 'linear-gradient(135deg, #d97706 0%, #ea580c 100%)' }
+          }}>Nuovo Ordine</Button>
+        </Box>
       </Box>
     </Paper>
   );
@@ -612,6 +584,7 @@ export default function GestioneAcquisti() {
                 <motion.tr
                   key={ordine.id}
                   component={TableRow}
+                  sx={{ '& td': { py: 0.8 } }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}

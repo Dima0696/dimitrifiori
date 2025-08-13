@@ -104,6 +104,12 @@ const GestioneFornitori: React.FC = () => {
     });
   }, [fornitori, searchTerm, tipoFilter, statoFilter]);
 
+  const kpi = {
+    totale: fornitori.length,
+    attivi: fornitori.filter(f => f.attivo).length,
+    inattivi: fornitori.filter(f => !f.attivo).length,
+  };
+
   const handleTipoFilterChange = (event: React.MouseEvent<HTMLElement>, newTipoFilter: string[]) => {
     setTipoFilter(newTipoFilter);
   };
@@ -224,46 +230,58 @@ const GestioneFornitori: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ mb: 4, textAlign: 'center' }}>
-        <Typography 
-          variant="h5" 
-          sx={{ 
-            fontWeight: 500,
-            color: 'grey.800',
-            mb: 1,
-            background: 'linear-gradient(45deg, #ff9800 30%, #ffb74d 90%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text'
-          }}
-        >
-          Gestione Fornitori
-        </Typography>
-        
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            color: 'grey.600',
-            mb: 2
-          }}
-        >
-          {fornitoriFiltered.length} fornitori {fornitoriFiltered.length !== fornitori.length ? `(su ${fornitori.length} totali)` : 'totali'}
-        </Typography>
-      </Box>
+    <Box sx={{ maxWidth: 1400, mx: 'auto', p: 2 }}>
+      {/* KPI Cards */}
+      <Grid container spacing={2} mb={2}>
+        {[{
+          label: 'Totale Fornitori',
+          value: kpi.totale,
+          color: '#10b981',
+          bg: '#ecfdf5'
+        }, {
+          label: 'Fornitori Attivi',
+          value: kpi.attivi,
+          color: '#2563eb',
+          bg: '#eff6ff'
+        }, {
+          label: 'Fornitori Inattivi',
+          value: kpi.inattivi,
+          color: '#ef4444',
+          bg: '#fef2f2'
+        }].map((card, idx) => (
+          <Grid item xs={12} sm={4} key={idx}>
+            <Box sx={{
+              p: 2,
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.200',
+              background: card.bg,
+            }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: card.color }}>
+                {card.value}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'grey.700', fontWeight: 500 }}>
+                {card.label}
+              </Typography>
+            </Box>
+          </Grid>
+        ))}
+      </Grid>
 
-      <Box display="flex" justifyContent="flex-end" alignItems="center" mb={3}>
+      <Box display="flex" justifyContent="flex-end" alignItems="center" mb={2}>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
           sx={{
-            borderRadius: 0,
+            borderRadius: 2,
             textTransform: 'none',
             fontWeight: 500,
-            boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+            background: 'linear-gradient(90deg, #10b981, #34d399)',
+            boxShadow: '0 6px 16px rgba(16, 185, 129, 0.3)',
             '&:hover': {
-              boxShadow: '0 6px 16px rgba(25, 118, 210, 0.4)',
+              background: 'linear-gradient(90deg, #059669, #10b981)',
+              boxShadow: '0 8px 20px rgba(16, 185, 129, 0.4)',
             }
           }}
         >
@@ -343,10 +361,10 @@ const GestioneFornitori: React.FC = () => {
                     border: '1px solid',
                     borderColor: 'grey.300',
                     '&.Mui-selected': {
-                      bgcolor: 'primary.main',
+                      bgcolor: '#10b981',
                       color: 'white',
                       '&:hover': {
-                        bgcolor: 'primary.dark',
+                        bgcolor: '#059669',
                       }
                     }
                   }

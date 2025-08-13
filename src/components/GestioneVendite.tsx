@@ -23,7 +23,13 @@ import {
   DialogActions,
   TextField,
   Autocomplete,
-  Tooltip
+  Tooltip,
+  useMediaQuery,
+  useTheme,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
@@ -63,6 +69,8 @@ function StatCard({ title, value, subtitle, color }: { title: string; value: str
 
 export default function GestioneVendite() {
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [tab, setTab] = React.useState(0);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -79,6 +87,13 @@ export default function GestioneVendite() {
   const [periodo, setPeriodo] = React.useState<'oggi'|'settimana'|'mese'|'anno'|'tutto'>('tutto');
   const [dataDa, setDataDa] = React.useState<string>('');
   const [dataA, setDataA] = React.useState<string>('');
+  const [soloResiduo, setSoloResiduo] = React.useState<boolean>(false);
+  const [tipoFatturaFiltro, setTipoFatturaFiltro] = React.useState<'tutte'|'immediata'|'differita'>('tutte');
+  const [selectedDdt, setSelectedDdt] = React.useState<DdtVendita | null>(null);
+  const [selectedFattura, setSelectedFattura] = React.useState<FatturaVendita | null>(null);
+  const [savedViews, setSavedViews] = React.useState<Array<{ name: string; scope: 'ddt'|'fatture'; payload: any }>>(()=>{
+    try { return JSON.parse(localStorage.getItem('venditeSavedViews') || '[]'); } catch { return []; }
+  });
   const [dialogOrdine, setDialogOrdine] = React.useState<{ open: boolean; cliente: Cliente | null; data: string; note: string; righe: Array<{ quantita: string; prezzo: string; sconto: string }>; }>({ open: false, cliente: null, data: new Date().toISOString().slice(0,10), note: '', righe: [{ quantita: '1', prezzo: '0', sconto: '0' }] });
   const [dialogDDT, setDialogDDT] = React.useState<{ open: boolean; cliente: Cliente | null; data: string; note: string; righe: Array<{ quantita: string; prezzo: string }>; }>({ open: false, cliente: null, data: new Date().toISOString().slice(0,10), note: '', righe: [{ quantita: '1', prezzo: '0' }] });
   const [dialogFattura, setDialogFattura] = React.useState<{ open: boolean; cliente: Cliente | null; data: string; note: string; righe: Array<{ quantita: string; prezzo: string }>; }>({ open: false, cliente: null, data: new Date().toISOString().slice(0,10), note: '', righe: [{ quantita: '1', prezzo: '0' }] });
@@ -90,6 +105,26 @@ export default function GestioneVendite() {
     textSecondary: '#64748b',
     border: 'rgba(148, 163, 184, 0.25)'
   };
+
+  // Stile coerente con GestioneMagazzino
+  const modernColors = {
+    background: 'rgba(255, 255, 255, 0.95)',
+    glass: 'rgba(255, 255, 255, 0.8)',
+    primary: '#f59e0b',
+    secondary: '#6b7280',
+    neutral: '#94a3b8',
+    text: '#1e293b',
+    textSecondary: '#64748b',
+    border: 'rgba(148, 163, 184, 0.25)',
+    gradient: 'linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)',
+    accent1: '#f59e0b',
+    accent2: '#10b981',
+    accent3: '#fb923c',
+    accent4: '#111827',
+  } as const;
+
+  const btnSx = { borderRadius: 0 } as const;
+  const chipSx = { borderRadius: 0 } as const;
 
   const formatEuro = React.useCallback((n: number) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' }).format(n || 0), []);
   const inPeriodo = React.useCallback((dateStr?: string | null) => {
@@ -109,6 +144,14 @@ export default function GestioneVendite() {
     if (periodo === 'anno') return d.slice(0, 4) === new Date().getFullYear().toString();
     return true;
   }, [dataDa, dataA, periodo]);
+
+  const scadMap = React.useMemo(() => new Map(scadenziario.map(r => [r.fattura_id, r])), [scadenziario]);
+
+  const statusOptions = React.useMemo(() => {
+    if (tab === 1) return ['da_fatturare','fatturato'];
+    if (tab === 2) return ['non_pagata','parzialmente_pagata','pagata'];
+    return [] as string[];
+  }, [tab]);
 
   const filteredOrdini = React.useMemo(() => (
     ordini
@@ -131,10 +174,12 @@ export default function GestioneVendite() {
       .filter(f => (q === '' || String(f.numero_fattura || f.id).includes(q) || (f.cliente_nome || '').toLowerCase().includes(q.toLowerCase())))
       .filter(f => (!clienteFiltro || f.cliente_id === clienteFiltro.id))
       .filter(f => (!statoFiltro || f.stato === statoFiltro))
+      .filter(f => (!soloResiduo || ((scadMap.get(f.id)?.residuo || 0) > 0)))
+      .filter(f => (tipoFatturaFiltro === 'tutte' ? true : ((f as any).tipo_fattura || 'immediata') === tipoFatturaFiltro))
       .filter(f => inPeriodo(f.data_fattura))
-  ), [fatture, q, clienteFiltro, statoFiltro, inPeriodo]);
+  ), [fatture, q, clienteFiltro, statoFiltro, inPeriodo, soloResiduo, tipoFatturaFiltro, scadMap]);
 
-  const scadMap = React.useMemo(() => new Map(scadenziario.map(r => [r.fattura_id, r])), [scadenziario]);
+  
 
   const loadAll = React.useCallback(async () => {
     try {
@@ -508,11 +553,21 @@ export default function GestioneVendite() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
+    <Box sx={{ maxWidth: 1400, mx: 'auto', mt: 1, background: modernColors.gradient, minHeight: '100vh', p: 2 }}>
+      {/* Header glass */}
+      <Box sx={{
+        mb: 2,
+        p: { xs: 2, md: 3 },
+        borderRadius: '16px',
+        background: modernColors.glass,
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${modernColors.border}`,
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)'
+      }}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: colors.text }}>Gestione Vendite</Typography>
-          <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500 }}>Ordini, DDT, Fatture e Incassi</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: modernColors.text }}>Gestione Vendite</Typography>
+          <Typography variant="body2" sx={{ color: modernColors.textSecondary, fontWeight: 500 }}>Ordini, DDT, Fatture e Incassi</Typography>
         </Box>
         <Stack direction="row" spacing={1}>
           <Button onClick={() => navigate('/vendite/nuova-fattura')} variant="contained" sx={{
@@ -528,28 +583,30 @@ export default function GestioneVendite() {
             '&:hover': { borderColor: '#6d28d9', bgcolor: '#7c3aed14' }
           }}>Nuovo DDT</Button>
           <Button onClick={() => navigate('/vendite/nuovo-ordine')} variant="outlined" sx={{
-            borderColor: colors.border,
-            color: colors.text,
+            borderColor: modernColors.border,
+            color: modernColors.text,
             borderRadius: 0,
             '&:hover': { bgcolor: '#00000007' }
           }}>Nuovo Ordine</Button>
           <Button onClick={() => navigate('/vendite/nuovo-reso')} variant="outlined" sx={{
-            borderColor: colors.border,
-            color: colors.text,
+            borderColor: modernColors.border,
+            color: modernColors.text,
             borderRadius: 0,
             '&:hover': { bgcolor: '#00000007' }
           }} startIcon={<AssignmentReturnIcon />}>Reso/NC</Button>
         </Stack>
       </Box>
 
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} md={3}><StatCard title="Ordini aperti" value={ordini.filter(o => o.stato !== 'annullato' && o.stato !== 'fatturato').length} color={colors.primary} /></Grid>
-        <Grid item xs={12} md={3}><StatCard title="DDT da fatturare" value={ddt.filter(x => x.stato === 'da_fatturare').length} color="#0ea5e9" /></Grid>
-        <Grid item xs={12} md={3}><StatCard title="Fatture" value={fatture.length} color="#10b981" /></Grid>
-        <Grid item xs={12} md={3}><StatCard title="Residuo da incassare" value={scadenziario.reduce((s,x)=>s+(x.residuo||0),0).toFixed(2)} color="#ef4444" /></Grid>
+      <Grid container spacing={isMobile ? 1 : 2} sx={{ mb: 2 }}>
+        <Grid item xs={6} md={3}><StatCard title="Ordini aperti" value={ordini.filter(o => o.stato !== 'annullato' && o.stato !== 'fatturato').length} color={modernColors.accent1} /></Grid>
+        <Grid item xs={6} md={3}><StatCard title="DDT da fatturare" value={ddt.filter(x => x.stato === 'da_fatturare').length} color={modernColors.accent2} /></Grid>
+        <Grid item xs={6} md={3}><StatCard title="Fatture" value={fatture.filter(f=>f.stato!=='annullata').length} color={modernColors.accent3} /></Grid>
+        <Grid item xs={6} md={3}><StatCard title="Residuo da incassare" value={scadenziario.reduce((s,x)=>s+(x.residuo||0),0).toFixed(2)} color={modernColors.accent4} /></Grid>
       </Grid>
+      </Box>
 
-      <Paper elevation={0} sx={{ p: 0, border: `1px solid ${colors.border}` }}>
+      {/* Contenitore Tabs in vetro */}
+      <Box sx={{ borderRadius: '16px', overflow: 'hidden', background: modernColors.glass, backdropFilter: 'blur(20px)', border: `1px solid ${modernColors.border}`, boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)' }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
@@ -561,18 +618,19 @@ export default function GestioneVendite() {
               fontWeight: 600,
               fontSize: '0.92rem',
               textTransform: 'none',
-              color: colors.textSecondary,
+              color: modernColors.textSecondary,
+              letterSpacing: '-0.01em',
               transition: 'all 0.25s ease',
-              borderRight: `1px solid ${colors.border}`,
+              borderRight: `1px solid ${modernColors.border}`,
               borderRadius: 0,
               '&.Mui-selected': {
-                color: colors.text,
+                color: modernColors.text,
                 fontWeight: 700,
-                background: `${colors.primary}14`,
-                outline: `2px solid ${colors.primary}`,
-                outlineOffset: '-2px'
+                background: `${modernColors.primary}14`,
+                outline: `2px solid ${modernColors.primary}`,
+                outlineOffset: '-2px',
               },
-              '&:hover': { color: colors.text, background: `${colors.primary}10` }
+              '&:hover': { color: modernColors.text, background: `${modernColors.primary}10` }
             },
             '& .MuiTabs-indicator': { display: 'none' }
           }}
@@ -584,7 +642,8 @@ export default function GestioneVendite() {
           <Tab icon={<AssignmentReturnIcon />} iconPosition="start" label="Resi / Note di credito" />
         </Tabs>
 
-        <Box sx={{ p: 2.5 }}>
+        {/* Toolbar filtri sticky */}
+        <Box sx={{ p: 2.5, position: 'sticky', top: 0, zIndex: 1, background: modernColors.background, backdropFilter: 'blur(10px)', borderBottom: `1px solid ${modernColors.border}` }}>
           {loading && <CircularProgress size={24} />}
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <ModernSearchBar
@@ -592,14 +651,35 @@ export default function GestioneVendite() {
             value={q}
             onChange={setQ}
             onClear={()=>setQ('')}
-            chips={[{ label: 'Tutti', onClick: ()=>{ setStatoFiltro(''); setClienteFiltro(null);} }]}
+            chips={[
+              { label: 'Tutti', onClick: ()=>{ setStatoFiltro(''); setClienteFiltro(null); setSoloResiduo(false); setTipoFatturaFiltro('tutte'); } },
+              ...(tab===2 ? [
+                { label: soloResiduo ? 'Residuo > 0 (ON)' : 'Residuo > 0', onClick: ()=> setSoloResiduo(v=>!v) },
+                { label: tipoFatturaFiltro==='immediata' ? 'Immediata (ON)' : 'Immediata', onClick: ()=> setTipoFatturaFiltro(v=> v==='immediata' ? 'tutte' : 'immediata') },
+                { label: tipoFatturaFiltro==='differita' ? 'Differita (ON)' : 'Differita', onClick: ()=> setTipoFatturaFiltro(v=> v==='differita' ? 'tutte' : 'differita') },
+              ] : [])
+            ].concat(savedViews
+              .filter(v => (tab===1 && v.scope==='ddt') || (tab===2 && v.scope==='fatture'))
+              .map(v => ({ label: `↺ ${v.name}`, onClick: ()=>{
+                const p = v.payload||{};
+                setQ(p.q||''); setClienteFiltro(p.clienteId ? (clienti.find(c=>c.id===p.clienteId)||null) : null);
+                setStatoFiltro(p.stato||''); setPeriodo(p.periodo||'tutto'); setDataDa(p.dataDa||''); setDataA(p.dataA||'');
+                setSoloResiduo(!!p.soloResiduo); setTipoFatturaFiltro(p.tipo||'tutte');
+              }}))
+            )}
             extra={
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Autocomplete size="small" sx={{ minWidth: 260 }} options={clienti} value={clienteFiltro}
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', overflowX: 'auto', '::-webkit-scrollbar': { display: 'none' } }}>
+                <Autocomplete size="small" sx={{ minWidth: 180 }} options={clienti} value={clienteFiltro}
                   onChange={(_,v)=>setClienteFiltro(v)} getOptionLabel={(o)=>o?.nome||''}
                   renderInput={(p)=><TextField {...p} label="Cliente" />}
                 />
-                <TextField size="small" label="Stato" value={statoFiltro} onChange={(e)=>setStatoFiltro(e.target.value)} sx={{ minWidth: 160 }} />
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel id="stato-label">Stato</InputLabel>
+                  <Select labelId="stato-label" label="Stato" value={statoFiltro} onChange={(e)=>setStatoFiltro(e.target.value)}>
+                    <MenuItem value=""><em>Tutti</em></MenuItem>
+                    {statusOptions.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  </Select>
+                </FormControl>
                 <SegmentedControl
                   value={periodo}
                   onChange={(v)=>setPeriodo(v as any)}
@@ -611,11 +691,54 @@ export default function GestioneVendite() {
                     { label:'Tutto', value:'tutto' },
                   ]}
                 />
-                <TextField size="small" type="date" label="Da" value={dataDa} onChange={(e)=>setDataDa(e.target.value)} InputLabelProps={{ shrink:true }} />
-                <TextField size="small" type="date" label="A" value={dataA} onChange={(e)=>setDataA(e.target.value)} InputLabelProps={{ shrink:true }} />
+                <TextField size="small" type="date" label="Da" value={dataDa} onChange={(e)=>setDataDa(e.target.value)} InputLabelProps={{ shrink:true }} sx={{ width: 150 }} />
+                <TextField size="small" type="date" label="A" value={dataA} onChange={(e)=>setDataA(e.target.value)} InputLabelProps={{ shrink:true }} sx={{ width: 150 }} />
+                <Button size="small" variant="outlined" onClick={loadAll} sx={btnSx}>Aggiorna</Button>
+                {tab!==0 && (
+                  <Button size="small" variant="outlined" onClick={()=>{
+                    const rows = tab===1 ? filteredDdt : (tab===2 ? filteredFatture : (tab===3 ? scadenziario : noteCredito));
+                    const headers = tab===1
+                      ? ['numero_ddt','data_ddt','cliente','stato']
+                      : tab===2
+                        ? ['numero_fattura','data_fattura','cliente','totale','stato','residuo']
+                        : tab===3
+                          ? ['numero_fattura','data_fattura','cliente','totale','incassato','residuo']
+                          : ['numero_nota','data_nota','cliente','totale','stato'];
+                    const csv = [headers.join(',')].concat((rows as any[]).map((r:any)=>{
+                      if (tab===1) return [r.numero_ddt||r.id, r.data_ddt, (r.cliente_nome||r.cliente_id), r.stato].join(',');
+                      if (tab===2) {
+                        const residuo = (scadMap.get(r.id)?.residuo || 0);
+                        return [r.numero_fattura||r.id, r.data_fattura, (r.cliente_nome||r.cliente_id), Number(r.totale||0).toFixed(2), r.stato, residuo.toFixed(2)].join(',');
+                      }
+                      if (tab===3) {
+                        return [r.numero_fattura, r.data_fattura, r.cliente_nome, Number(r.totale||0).toFixed(2), Number(r.incassato||0).toFixed(2), Number(r.residuo||0).toFixed(2)].join(',');
+                      }
+                      // tab===4 note credito
+                      return [r.numero_nota||r.id, r.data_nota, (r.cliente_nome||r.cliente_id), Number(r.totale||0).toFixed(2), r.stato].join(',');
+                    })).join('\n');
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    const name = tab===1 ? 'ddt' : (tab===2 ? 'fatture' : (tab===3 ? 'incassi' : 'note_credito'));
+                    a.href = url; a.download = `${name}.csv`; a.click(); URL.revokeObjectURL(url);
+                  }} sx={btnSx}>Export CSV</Button>
+                )}
+                {tab!==0 && (
+                  <Button size="small" variant="contained" onClick={()=>{
+                    const payload = { q, clienteId: clienteFiltro?.id, stato: statoFiltro, periodo, dataDa, dataA, soloResiduo, tipo: tipoFatturaFiltro };
+                    const name = prompt('Nome vista salvata');
+                    if (!name) return;
+                    const scope = tab===1 ? 'ddt' : 'fatture';
+                    const updated = [...savedViews.filter(v=>!(v.name===name && v.scope===scope)), { name, scope, payload }];
+                    setSavedViews(updated); localStorage.setItem('venditeSavedViews', JSON.stringify(updated));
+                  }} sx={btnSx}>Salva</Button>
+                )}
               </Stack>
             }
           />
+        </Box>
+
+        <Box sx={{ p: 2.5, background: modernColors.background }}>
           {tab === 0 && (
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: colors.text }}>Ordini cliente</Typography>
@@ -679,7 +802,7 @@ export default function GestioneVendite() {
                 <TableBody>
                   {filteredDdt
                     .map(d => (
-                    <TableRow key={d.id} hover>
+                    <TableRow key={d.id} hover selected={selectedDdt?.id===d.id} onClick={()=>setSelectedDdt(d)} sx={{ cursor:'pointer' }}>
                       <TableCell>{d.numero_ddt || d.id}</TableCell>
                       <TableCell>{d.data_ddt}</TableCell>
                       <TableCell>{d.cliente_nome || d.cliente_id}</TableCell>
@@ -691,14 +814,14 @@ export default function GestioneVendite() {
                       </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <IconButton size="small" title="Stampa DDT" onClick={() => handleStampaDDT(d.id)} disabled={d.stato!=='da_fatturare'}>
+                          <IconButton size="small" title="Stampa DDT" onClick={(e) => { e.stopPropagation(); handleStampaDDT(d.id); }} disabled={d.stato!=='da_fatturare'}>
                             <PrintIcon fontSize="small" />
                           </IconButton>
-                          <Button size="small" variant="outlined" onClick={()=>navigate(`/vendite/nuovo-ddt?id=${d.id}`)} sx={{ borderRadius:0 }} disabled={d.stato!=='da_fatturare'}>Modifica</Button>
-                          <IconButton size="small" title="Genera Fattura" onClick={() => handleGeneraFattura(d.id)} disabled={d.stato !== 'da_fatturare'}>
+                          <Button size="small" variant="outlined" onClick={(e)=>{ e.stopPropagation(); navigate(`/vendite/nuovo-ddt?id=${d.id}`); }} sx={btnSx} disabled={d.stato!=='da_fatturare'}>Modifica</Button>
+                          <IconButton size="small" title="Genera Fattura" onClick={(e) => { e.stopPropagation(); handleGeneraFattura(d.id); }} disabled={d.stato !== 'da_fatturare'}>
                             <ReceiptIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" title="Annulla DDT" onClick={() => handleAnnullaDDT(d.id)} disabled={d.stato !== 'da_fatturare'}>
+                          <IconButton size="small" title="Annulla DDT" onClick={(e) => { e.stopPropagation(); handleAnnullaDDT(d.id); }} disabled={d.stato !== 'da_fatturare'}>
                             <CancelIcon fontSize="small" />
                           </IconButton>
                         </Stack>
@@ -709,11 +832,29 @@ export default function GestioneVendite() {
                   </Table>
                 </Grid>
                 <Grid item xs={12} md={3}>
-                  <Stack spacing={1.25} sx={{ position: { md:'sticky' }, top: { md: 16 } }}>
-                    <StatCard title="DDT filtrati" value={filteredDdt.length} color={colors.sales} />
-                    <StatCard title="Da fatturare" value={filteredDdt.filter(x=>x.stato==='da_fatturare').length} color="#0ea5e9" />
-                    <StatCard title="Fatturati" value={filteredDdt.filter(x=>x.stato==='fatturato').length} color="#10b981" />
-                  </Stack>
+                  {selectedDdt ? (
+                    <Paper elevation={0} sx={{ p:2, border:`1px solid ${modernColors.border}`, background: modernColors.glass, backdropFilter: 'blur(10px)' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight:700, mb:1 }}>Dettagli DDT</Typography>
+                      <Stack spacing={0.75} sx={{ mb:1 }}>
+                        <Typography variant="body2">N.: <b>{selectedDdt.numero_ddt || selectedDdt.id}</b></Typography>
+                        <Typography variant="body2">Data: {selectedDdt.data_ddt}</Typography>
+                        <Typography variant="body2">Cliente: {selectedDdt.cliente_nome || selectedDdt.cliente_id}</Typography>
+                        <Chip size="small" label={selectedDdt.stato} sx={{ borderRadius:0, width:'fit-content' }} />
+                      </Stack>
+                      <Stack direction="row" spacing={1} flexWrap={'wrap'}>
+                        <Button size="small" variant="outlined" onClick={()=>handleStampaDDT(selectedDdt.id)} sx={btnSx} disabled={selectedDdt.stato!=='da_fatturare'}>Stampa</Button>
+                        <Button size="small" variant="outlined" onClick={()=>navigate(`/vendite/nuovo-ddt?id=${selectedDdt.id}`)} sx={btnSx} disabled={selectedDdt.stato!=='da_fatturare'}>Modifica</Button>
+                        <Button size="small" variant="contained" onClick={()=>handleGeneraFattura(selectedDdt.id)} sx={btnSx} disabled={selectedDdt.stato!=='da_fatturare'}>Fattura</Button>
+                        <Button size="small" variant="outlined" color="error" onClick={()=>handleAnnullaDDT(selectedDdt.id)} sx={btnSx} disabled={selectedDdt.stato!=='da_fatturare'}>Annulla</Button>
+                      </Stack>
+                    </Paper>
+                  ) : (
+                    <Stack spacing={1.25} sx={{ position: { md:'sticky' }, top: { md: 16 } }}>
+                      <StatCard title="DDT filtrati" value={filteredDdt.length} color={colors.sales} />
+                      <StatCard title="Da fatturare" value={filteredDdt.filter(x=>x.stato==='da_fatturare').length} color="#0ea5e9" />
+                      <StatCard title="Fatturati" value={filteredDdt.filter(x=>x.stato==='fatturato').length} color="#10b981" />
+                    </Stack>
+                  )}
                 </Grid>
               </Grid>
             </Box>
@@ -737,7 +878,7 @@ export default function GestioneVendite() {
                 <TableBody>
                   {filteredFatture
                     .map(f => (
-                    <TableRow key={f.id} hover>
+                    <TableRow key={f.id} hover selected={selectedFattura?.id===f.id} onClick={()=>setSelectedFattura(f)} sx={{ cursor:'pointer' }}>
                       <TableCell>{f.numero_fattura || f.id}</TableCell>
                       <TableCell>{f.data_fattura}</TableCell>
                       <TableCell>{f.cliente_nome || f.cliente_id}</TableCell>
@@ -766,23 +907,23 @@ export default function GestioneVendite() {
                       </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <IconButton size="small" title="Stampa/PDF" onClick={() => handleStampaFattura(f.id)}>
+                          <IconButton size="small" title="Stampa/PDF" onClick={(e) => { e.stopPropagation(); handleStampaFattura(f.id); }}>
                             <PrintIcon fontSize="small" />
                           </IconButton>
-                          <Button size="small" variant="outlined" onClick={()=>navigate(`/vendite/nuova-fattura?id=${f.id}`)} sx={{ borderRadius:0 }}
+                          <Button size="small" variant="outlined" onClick={(e)=>{ e.stopPropagation(); navigate(`/vendite/nuova-fattura?id=${f.id}`); }} sx={btnSx}
                             disabled={f.tipo_fattura==='differita' || !!f.trasmessa_ade_at || ((new Date().getTime() - new Date(f.created_at || f.data_fattura).getTime()) > 48*3600*1000)}
                           >Modifica</Button>
-                          <IconButton size="small" title="Registra Incasso" onClick={() => handleApriIncasso(f)} disabled={f.stato==='annullata'}>
+                          <IconButton size="small" title="Registra Incasso" onClick={(e) => { e.stopPropagation(); handleApriIncasso(f); }} disabled={f.stato==='annullata'}>
                             <AddCardIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" title="Invia Email" onClick={() => {
+                          <IconButton size="small" title="Invia Email" onClick={(e) => { e.stopPropagation();
                             const subject = encodeURIComponent(`Fattura ${f.numero_fattura||f.id}`);
                             const body = encodeURIComponent(`Buongiorno,\n\nLe inviamo il riepilogo della fattura ${f.numero_fattura||f.id} del ${f.data_fattura}.\nTotale: € ${Number(f.totale||0).toFixed(2)}\n\nCordiali saluti.`);
                             window.location.href = `mailto:?subject=${subject}&body=${body}`;
                           }}>
                             <EmailIcon fontSize="small" />
                           </IconButton>
-                          <IconButton size="small" title="Annulla Fattura" onClick={() => handleAnnullaFattura(f)}
+                          <IconButton size="small" title="Annulla Fattura" onClick={(e) => { e.stopPropagation(); handleAnnullaFattura(f); }}
                             disabled={f.stato==='annullata' || f.tipo_fattura==='differita' || !!f.trasmessa_ade_at || ((new Date().getTime() - new Date(f.created_at || f.data_fattura).getTime()) > 48*3600*1000)}
                           >
                             <CancelIcon fontSize="small" />
@@ -796,11 +937,34 @@ export default function GestioneVendite() {
                   </Table>
                 </Grid>
                 <Grid item xs={12} md={3}>
-                  <Stack spacing={1.25} sx={{ position: { md:'sticky' }, top: { md: 16 } }}>
-                    <StatCard title="Fatture filtrate" value={filteredFatture.length} color={colors.sales} />
-                    <StatCard title="Totale (filtrate)" value={formatEuro(filteredFatture.reduce((s,f)=>s+Number(f.totale||0),0))} color="#10b981" />
-                    <StatCard title="Residuo (filtrate)" value={formatEuro(filteredFatture.reduce((s,f)=> s + (scadMap.get(f.id)?.residuo || 0), 0))} color="#ef4444" />
-                  </Stack>
+                  {selectedFattura ? (
+                    <Paper elevation={0} sx={{ p:2, border:`1px solid ${modernColors.border}`, background: modernColors.glass, backdropFilter: 'blur(10px)' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight:700, mb:1 }}>Dettagli Fattura</Typography>
+                      <Stack spacing={0.75} sx={{ mb:1 }}>
+                        <Typography variant="body2">N.: <b>{selectedFattura.numero_fattura || selectedFattura.id}</b></Typography>
+                        <Typography variant="body2">Data: {selectedFattura.data_fattura}</Typography>
+                        <Typography variant="body2">Cliente: {selectedFattura.cliente_nome || selectedFattura.cliente_id}</Typography>
+                        <Typography variant="body2">Totale: {formatEuro(Number(selectedFattura.totale||0))}</Typography>
+                        <Chip size="small" label={selectedFattura.stato} sx={{ borderRadius:0, width:'fit-content' }} />
+                      </Stack>
+                      <Stack direction="row" spacing={1} flexWrap={'wrap'}>
+                        <Button size="small" variant="outlined" onClick={()=>handleStampaFattura(selectedFattura.id)} sx={btnSx}>Stampa</Button>
+                        <Button size="small" variant="outlined" onClick={()=>navigate(`/vendite/nuova-fattura?id=${selectedFattura.id}`)} sx={btnSx}
+                          disabled={selectedFattura.tipo_fattura==='differita' || !!(selectedFattura as any).trasmessa_ade_at || ((new Date().getTime() - new Date((selectedFattura as any).created_at || selectedFattura.data_fattura).getTime()) > 48*3600*1000)}
+                        >Modifica</Button>
+                        <Button size="small" variant="contained" onClick={()=>handleApriIncasso(selectedFattura)} sx={btnSx} disabled={selectedFattura.stato==='annullata'}>Incasso</Button>
+                        <Button size="small" variant="outlined" color="error" onClick={()=>handleAnnullaFattura(selectedFattura)} sx={btnSx}
+                          disabled={selectedFattura.stato==='annullata' || selectedFattura.tipo_fattura==='differita' || !!(selectedFattura as any).trasmessa_ade_at || ((new Date().getTime() - new Date((selectedFattura as any).created_at || selectedFattura.data_fattura).getTime()) > 48*3600*1000)}
+                        >Annulla</Button>
+                      </Stack>
+                    </Paper>
+                  ) : (
+                    <Stack spacing={1.25} sx={{ position: { md:'sticky' }, top: { md: 16 } }}>
+                      <StatCard title="Fatture filtrate" value={filteredFatture.length} color={colors.sales} />
+                      <StatCard title="Totale (filtrate)" value={formatEuro(filteredFatture.reduce((s,f)=>s+Number(f.totale||0),0))} color="#10b981" />
+                      <StatCard title="Residuo (filtrate)" value={formatEuro(filteredFatture.reduce((s,f)=> s + (scadMap.get(f.id)?.residuo || 0), 0))} color="#ef4444" />
+                    </Stack>
+                  )}
                 </Grid>
               </Grid>
             </Box>
@@ -865,11 +1029,11 @@ export default function GestioneVendite() {
             </Box>
           )}
         </Box>
-      </Paper>
+      </Box>
 
       {/* Fatturazione differita */}
       <Box sx={{ mt: 2, display: tab===1 ? 'block':'none' }}>
-        <Paper elevation={0} sx={{ p: 2, border: `1px solid ${colors.border}` }}>
+        <Paper elevation={0} sx={{ p: 2, border: `1px solid ${modernColors.border}`, background: modernColors.glass, backdropFilter: 'blur(10px)' }}>
           <Stack direction={{ xs:'column', md:'row' }} spacing={1} alignItems={{ md:'center' }}>
             <Typography variant="body2" sx={{ fontWeight: 700, color: colors.text }}>Fatturazione differita</Typography>
             <TextField size="small" label="Anno" defaultValue={new Date().getFullYear()} id="diff-anno" />

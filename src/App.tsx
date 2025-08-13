@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import Login from './pages/Login';
@@ -10,6 +10,7 @@ import Webshop from './pages/Webshop';
 import Dashboard from './components/Dashboard';
 import MainLayout from './components/MainLayout';
 import GestioneFornitori from './components/anagrafica/GestioneFornitori';
+import GestioneClienti from './components/anagrafica/GestioneClienti';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 import GestioneMagazzino from './components/GestioneMagazzino';
@@ -22,6 +23,8 @@ import OrdineWizard from './components/vendite/OrdineWizard';
 import DDTWizard from './components/vendite/DDTWizard';
 import FatturaWizard from './components/vendite/FatturaWizard';
 import ResoWizard from './components/vendite/ResoWizard';
+import Statistiche from './components/Statistiche';
+import Contabilita from './components/Contabilita';
 
 
 
@@ -52,9 +55,14 @@ function App() {
                 
                 {/* Anagrafica - Sistema nuovo */}
                 <Route path="/anagrafica" element={<ProtectedRoute><MainLayout title="Anagrafica"><Anagrafica /></MainLayout></ProtectedRoute>} />
+                {/* Redirect legacy sotto-percorsi di Anagrafica */}
+                <Route path="/anagrafica/clienti" element={<Navigate to="/clienti" replace />} />
+                <Route path="/anagrafica/fornitori" element={<Navigate to="/fornitori" replace />} />
                 
                 {/* Fornitori */}
                 <Route path="/fornitori" element={<ProtectedRoute><MainLayout title="Gestione Fornitori"><GestioneFornitori /></MainLayout></ProtectedRoute>} />
+                {/* Clienti */}
+                <Route path="/clienti" element={<ProtectedRoute><MainLayout title="Gestione Clienti"><GestioneClienti /></MainLayout></ProtectedRoute>} />
                 
                 {/* Gestione Acquisti */}
                 <Route path="/acquisti" element={<ProtectedRoute><MainLayout title="Gestione Acquisti"><GestioneAcquisti /></MainLayout></ProtectedRoute>} />
@@ -68,6 +76,10 @@ function App() {
 
                 {/* Test API */}
                 <Route path="/test-api" element={<ProtectedRoute><MainLayout title="Test API Service"><TestApiService /></MainLayout></ProtectedRoute>} />
+                {/* Statistiche */}
+                <Route path="/statistiche" element={<ProtectedRoute><MainLayout title="Statistiche"><Statistiche /></MainLayout></ProtectedRoute>} />
+                {/* Contabilità */}
+                <Route path="/contabilita" element={<ProtectedRoute><MainLayout title="Contabilità"><Contabilita /></MainLayout></ProtectedRoute>} />
                 
                 {/* Webshop (esterno) */}
                 <Route path="/webshop" element={<Webshop />} />

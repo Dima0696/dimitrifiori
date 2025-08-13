@@ -466,6 +466,126 @@ export interface PagamentoVendita {
 }
 
 class ApiService {
+  // REPORT: venduto per articolo con prezzi acquisto/vendita
+  async getVendutoArticoli(params: {
+    from?: string; // ISO date
+    to?: string;   // ISO date
+    clienteId?: number;
+    gruppoId?: number;
+    prodottoId?: number;
+  }): Promise<Array<{
+    articolo_id: number;
+    nome: string;
+    data?: string;
+    gruppo_id?: number | null;
+    prodotto_id?: number | null;
+    quantita: number;
+    prezzo_medio_vendita: number;
+    prezzo_medio_acquisto: number;
+    ricarico_euro: number;
+    ricarico_percent: number;
+  }>> {
+    const { from, to, clienteId, gruppoId, prodottoId } = params || {};
+    let query = supabase
+      .from('view_venduto_articoli')
+      .select('*');
+    if (from) query = query.gte('data', from);
+    if (to) query = query.lte('data', to);
+    if (clienteId) query = query.eq('cliente_id', clienteId);
+    if (gruppoId) query = query.eq('gruppo_id', gruppoId);
+    if (prodottoId) query = query.eq('prodotto_id', prodottoId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as any[])?.map((r) => ({
+      articolo_id: r.articolo_id,
+      nome: r.nome_articolo,
+      data: r.data,
+      gruppo_id: r.gruppo_id ?? null,
+      prodotto_id: r.prodotto_id ?? null,
+      quantita: Number(r.quantita) || 0,
+      prezzo_medio_vendita: Number(r.prezzo_medio_vendita) || 0,
+      prezzo_medio_acquisto: Number(r.prezzo_medio_acquisto) || 0,
+      ricarico_euro: Number(r.ricarico_euro) || 0,
+      ricarico_percent: Number(r.ricarico_percent) || 0,
+    })) || [];
+  }
+
+  // REPORT: dettaglio clienti con articoli acquistati
+  async getVendutoClienti(params: {
+    from?: string;
+    to?: string;
+    clienteId?: number;
+  }): Promise<Array<{
+    cliente_id: number;
+    cliente_nome: string;
+    articolo_nome: string;
+    quantita: number;
+    valore: number;
+  }>> {
+    const { from, to, clienteId } = params || {};
+    let query = supabase
+      .from('view_venduto_clienti_articoli')
+      .select('*');
+    if (from) query = query.gte('data', from);
+    if (to) query = query.lte('data', to);
+    if (clienteId) query = query.eq('cliente_id', clienteId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as any[])?.map((r) => ({
+      cliente_id: r.cliente_id,
+      cliente_nome: r.cliente_nome,
+      articolo_nome: r.articolo_nome,
+      quantita: Number(r.quantita) || 0,
+      valore: Number(r.valore) || 0,
+    })) || [];
+  }
+
+  // REPORT: distruzioni per articolo e periodo
+  async getDistruzioniArticoli(params: { from?: string; to?: string }): Promise<Array<{
+    articolo_id: number;
+    articolo_nome: string;
+    data: string;
+    quantita: number;
+    costo_totale: number;
+  }>> {
+    const { from, to } = params || {};
+    let query = supabase.from('view_distruzioni_articoli').select('*');
+    if (from) query = query.gte('data', from);
+    if (to) query = query.lte('data', to);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as any[])?.map((r) => ({
+      articolo_id: r.articolo_id,
+      articolo_nome: r.articolo_nome,
+      data: r.data,
+      quantita: Number(r.quantita) || 0,
+      costo_totale: Number(r.costo_totale) || 0,
+    })) || [];
+  }
+
+  // REPORT: elenco fatture vendita con filtro periodo/cliente/stato
+  async getFattureVenditaPeriodo(params: { from?: string; to?: string; clienteId?: number; stato?: string }): Promise<Array<{
+    id: number;
+    numero_fattura: string;
+    data_fattura: string;
+    cliente_id: number;
+    cliente_nome: string;
+    totale: number;
+    stato: string;
+  }>> {
+    const { from, to, clienteId, stato } = params || {};
+    let query = supabase
+      .from('view_fatture_vendita_completi')
+      .select('id, numero_fattura, data_fattura, cliente_id, cliente_nome, totale, stato')
+      .order('data_fattura', { ascending: false });
+    if (from) query = query.gte('data_fattura', from);
+    if (to) query = query.lte('data_fattura', to);
+    if (clienteId) query = query.eq('cliente_id', clienteId);
+    if (stato) query = query.eq('stato', stato);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as any[]) || [];
+  }
   
   // === GRUPPI ===
   async getGruppi(): Promise<Gruppo[]> {
@@ -548,6 +668,7 @@ class ApiService {
     const { data, error } = await supabase
       .from('view_ddt_vendita_completi')
       .select('*')
+      .neq('stato', 'annullato')
       .order('data_ddt', { ascending: false });
     if (error) throw error;
     return (data as DdtVendita[]) || [];
@@ -577,12 +698,12 @@ class ApiService {
   }
 
   async replaceDDTRighe(id: number, righe: Array<Omit<DdtVenditaRiga, 'id' | 'ddt_id'>>): Promise<void> {
-    const { error: e1 } = await supabase.from('ddt_vendita_righe').delete().eq('ddt_id', id);
-    if (e1) throw e1;
-    if (righe?.length) {
-      const { error: e2 } = await supabase.from('ddt_vendita_righe').insert(righe.map(r => ({ ...r, ddt_id: id })));
-      if (e2) throw e2;
-    }
+    const payload = (righe || []).map(r => ({ ...r }));
+    const { error } = await supabase.rpc('replace_ddt_righe', {
+      p_ddt_id: id,
+      p_righe: payload as any,
+    });
+    if (error) throw error;
   }
 
   async addDDTRighe(id: number, righe: Array<Omit<DdtVenditaRiga, 'id' | 'ddt_id'>>): Promise<void> {
@@ -627,6 +748,7 @@ class ApiService {
     const { data, error } = await supabase
       .from('view_fatture_vendita_completi')
       .select('*')
+      .neq('stato', 'annullata')
       .order('data_fattura', { ascending: false });
     if (error) throw error;
     return (data as FatturaVendita[]) || [];
@@ -718,21 +840,17 @@ class ApiService {
     prezzo_finale: number;
     iva_percentuale?: number;
   }>): Promise<void> {
-    // Cancella le righe esistenti della fattura
-    const { error: e1 } = await supabase.from('fatture_vendita_righe').delete().eq('fattura_id', id);
-    if (e1) throw e1;
-
-    // Inserisce le nuove righe (se presenti)
-    if (righe?.length) {
-      const payload = righe.map(r => ({
-        ...r,
-        fattura_id: id,
-        sconto_percentuale: r.sconto_percentuale ?? 0,
-        iva_percentuale: r.iva_percentuale ?? 0,
-      }));
-      const { error: e2 } = await supabase.from('fatture_vendita_righe').insert(payload);
-      if (e2) throw e2;
-    }
+    // Usa RPC transazionale per garantire ordine DELETE -> INSERT lato server
+    const payload = (righe || []).map(r => ({
+      ...r,
+      sconto_percentuale: r.sconto_percentuale ?? 0,
+      iva_percentuale: r.iva_percentuale ?? 0,
+    }));
+    const { error } = await supabase.rpc('replace_fattura_righe', {
+      p_fattura_id: id,
+      p_righe: payload as any,
+    });
+    if (error) throw error;
   }
 
   async getFatturaVenditaById(id: number): Promise<{ fattura: FatturaVendita; righe: FatturaVenditaRiga[] }> {
@@ -842,6 +960,57 @@ class ApiService {
   async registraIncassoVendita(pagamento: Omit<PagamentoVendita, 'id'>): Promise<void> {
     const { error } = await supabase.from('pagamenti_vendita').insert([pagamento]);
     if (error) throw error;
+    // Scrivi anche nel registro di cassa (entrata)
+    const causale = `Incasso fattura vendita ${pagamento.fattura_id}`;
+    const { error: e2 } = await supabase.from('registro_cassa').insert([{
+      data_operazione: (pagamento as any).data_pagamento,
+      causale,
+      tipo: 'entrata',
+      importo: (pagamento as any).importo,
+      metodo: (pagamento as any).metodo,
+      riferimento_tipo: 'fattura_vendita',
+      riferimento_id: (pagamento as any).fattura_id,
+    }]);
+    if (e2) throw e2;
+  }
+
+  async getIncassiVenditaByFattura(fatturaId: number): Promise<Array<{ id: number; data_pagamento: string; importo: number; metodo: string; note?: string }>> {
+    const { data, error } = await supabase
+      .from('pagamenti_vendita')
+      .select('id, data_pagamento, importo, metodo, note')
+      .eq('fattura_id', fatturaId)
+      .order('data_pagamento', { ascending: false });
+    if (error) throw error;
+    return (data as any[]) || [];
+  }
+
+  async annullaIncassoVendita(incassoId: number): Promise<void> {
+    // Recupera incasso
+    const { data: inc, error: eSel } = await supabase
+      .from('pagamenti_vendita')
+      .select('id, fattura_id, data_pagamento, importo, metodo')
+      .eq('id', incassoId)
+      .single();
+    if (eSel) throw eSel;
+    if (!inc) return;
+    // Elimina incasso
+    const { error: eDel } = await supabase
+      .from('pagamenti_vendita')
+      .delete()
+      .eq('id', incassoId);
+    if (eDel) throw eDel;
+    // Storno in cassa (uscita)
+    const causale = `Storno incasso fattura vendita ${inc.fattura_id}`;
+    const { error: eCassa } = await supabase.from('registro_cassa').insert([{
+      data_operazione: inc.data_pagamento,
+      causale,
+      tipo: 'uscita',
+      importo: inc.importo,
+      metodo: inc.metodo,
+      riferimento_tipo: 'fattura_vendita',
+      riferimento_id: inc.fattura_id,
+    }]);
+    if (eCassa) throw eCassa;
   }
 
   async getScadenziarioClienti(): Promise<Array<{ fattura_id: number; numero_fattura: string; cliente_nome: string; totale: number; incassato: number; residuo: number; data_fattura: string }>> {
@@ -1567,17 +1736,189 @@ class ApiService {
     const { data, error } = await supabase
       .from('fatture_acquisto')
       .select(`
-        *,
-        fornitori (
-          id,
-          nome,
-          ragione_sociale
-        )
+        id, numero, data, fornitore_id, totale, stato, note,
+        fornitori:fornitori!fatture_acquisto_fornitore_id_fkey ( id, nome ),
+        costi_fattura ( id, tipologia_costo_id, importo, fornitore_costo_id )
       `)
       .order('data', { ascending: false });
     
     if (error) throw error;
     return data || [];
+  }
+
+  // Vista contabilità: fatture_acquisto con totale_costi_spalmati e dettaglio fornitori costo
+  async getFatturePassiveContabilita(params: { from?: string; to?: string; fornitoreId?: number; stato?: string }): Promise<any[]> {
+    const { from, to, fornitoreId, stato } = params || {};
+    let query = supabase
+      .from('fatture_acquisto')
+      .select(`
+        id, numero, data, fornitore_id, totale, stato,
+        fornitori:fornitori!fatture_acquisto_fornitore_id_fkey ( id, nome ),
+        costi_fattura ( id, importo, fornitore_costo_id, tipologia_costo_id,
+          fornitore_costo:fornitori!costi_fattura_fornitore_costo_id_fkey ( id, nome )
+        ),
+        pagamenti_fornitori ( id, importo, data_pagamento, metodo, note )
+      `)
+      .order('data', { ascending: false });
+    if (from) query = query.gte('data', from);
+    if (to) query = query.lte('data', to);
+    if (fornitoreId) query = query.eq('fornitore_id', fornitoreId);
+    if (stato) query = query.eq('stato', stato);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as any[])?.map((f:any)=>{
+      const totale_costi_spalmati = (f.costi_fattura || []).reduce((s:number,c:any)=> s + (Number(c.importo)||0), 0);
+      const pagato = (f.pagamenti_fornitori || []).reduce((s:number,p:any)=> s + (Number(p.importo)||0), 0);
+      const residuo = Math.max((Number(f.totale)||0) - pagato, 0);
+      let stato_pagamento = 'non_pagata';
+      if (pagato > 0 && residuo > 0) stato_pagamento = 'parziale';
+      if (residuo === 0 && (Number(f.totale)||0) > 0) stato_pagamento = 'pagata';
+      return { ...f, totale_costi_spalmati, pagato, residuo, stato_pagamento };
+    }) || [];
+  }
+
+  // Registro cassa: entrate/uscite
+  async getRegistroCassa(params: { from?: string; to?: string; tipo?: 'entrata'|'uscita'; metodo?: 'contanti'|'bonifico'|'pos'|'assegno'|'paypal'|'altro' }): Promise<Array<{ id: number; data_operazione: string; causale: string; tipo: string; importo: number; metodo: string; riferimento_tipo?: string; riferimento_id?: number }>> {
+    const { from, to, tipo, metodo } = params || {};
+    let query = supabase
+      .from('registro_cassa')
+      .select('id, data_operazione, causale, tipo, importo, metodo, riferimento_tipo, riferimento_id')
+      .order('data_operazione', { ascending: false });
+    if (from) query = query.gte('data_operazione', from);
+    if (to) query = query.lte('data_operazione', to);
+    if (tipo) query = query.eq('tipo', tipo);
+    if (metodo) query = query.eq('metodo', metodo);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as any[]) || [];
+  }
+
+  // Attive con incassi/residuo (view_scadenziario_clienti)
+  async getFattureVenditaConIncassi(params: { from?: string; to?: string; clienteId?: number }): Promise<Array<{ id: number; numero_fattura: string; data_fattura: string; cliente_id: number; cliente_nome: string; totale: number; incassato: number; residuo: number }>> {
+    const { from, to, clienteId } = params || {};
+    let query = supabase
+      .from('view_scadenziario_clienti')
+      .select('*')
+      .order('data_fattura', { ascending: false });
+    if (from) query = query.gte('data_fattura', from);
+    if (to) query = query.lte('data_fattura', to);
+    if (clienteId) query = query.eq('cliente_id', clienteId);
+    const { data, error } = await query;
+    if (error) throw error;
+    const fatture = (data as any[]) || [];
+    if (!fatture.length) return [] as any[];
+    // Carica pagamenti per le fatture in elenco e fondi nello stesso payload
+    const ids = fatture.map((f:any)=> f.fattura_id ?? f.id).filter((v:any)=> v != null);
+    try {
+      const { data: pays, error: e2 } = await supabase
+        .from('pagamenti_vendita')
+        .select('id, fattura_id, data_pagamento, importo, metodo, note')
+        .in('fattura_id', ids);
+      if (e2) throw e2;
+      const byFattura: Record<number, any[]> = {};
+      (pays || []).forEach((p:any)=>{
+        if (!byFattura[p.fattura_id]) byFattura[p.fattura_id] = [];
+        byFattura[p.fattura_id].push(p);
+      });
+      return fatture.map((f:any)=> {
+        const id = f.fattura_id ?? f.id;
+        return { ...f, id, pagamenti_vendita: byFattura[id] || [] };
+      });
+    } catch (e) {
+      // Se fallisce, ritorna comunque l'elenco fatture
+      return fatture.map((f:any)=> ({ ...f, id: f.fattura_id ?? f.id })) as any[];
+    }
+  }
+
+  // DDT da fatturare (differite)
+  async getDDTDaFatturare(): Promise<Array<{ id: number; numero_ddt: string; data_ddt: string; cliente_id: number }>> {
+    const { data, error } = await supabase
+      .from('ddt_vendita')
+      .select('id, numero_ddt, data_ddt:data, cliente_id')
+      .eq('stato', 'da_fatturare')
+      .order('data', { ascending: false });
+    if (error) throw error;
+    return (data as any[]) || [];
+  }
+
+  // Generazione fattura differita da DDT
+  async generaFatturaDaDDT(ddtId: number): Promise<{ fattura_id: number; numero_fattura: string } | null> {
+    const { data, error } = await supabase.rpc('genera_fattura_vendita_da_ddt', { p_ddt_id: ddtId });
+    if (error) throw error;
+    return (data as any) || null;
+  }
+
+  // Upload PDF fatture passive
+  async uploadFatturaPassivaPdf(fatturaId: number, file: File): Promise<string> {
+    const path = `${fatturaId}/${Date.now()}_${file.name}`;
+    const { data, error } = await supabase.storage.from('allegati-fatture-passive').upload(path, file, { upsert: true, contentType: file.type });
+    if (error) throw error;
+    const { data: url } = supabase.storage.from('allegati-fatture-passive').getPublicUrl(path);
+    return url.publicUrl;
+  }
+
+  // Pagamento fornitore + scrittura cassa
+  async registraPagamentoFornitore(input: { fattura_acquisto_id: number; data_pagamento: string; importo: number; metodo: 'contanti'|'bonifico'|'pos'|'assegno'|'paypal'|'altro'; note?: string }): Promise<void> {
+    const { error } = await supabase.from('pagamenti_fornitori').insert([{
+      fattura_acquisto_id: input.fattura_acquisto_id,
+      data_pagamento: input.data_pagamento,
+      importo: input.importo,
+      metodo: input.metodo,
+      note: input.note || null,
+    }]);
+    if (error) throw error;
+    const causale = `Pagamento fornitore fattura ${input.fattura_acquisto_id}`;
+    const { error: e2 } = await supabase.from('registro_cassa').insert([{
+      data_operazione: input.data_pagamento,
+      causale,
+      tipo: 'uscita',
+      importo: input.importo,
+      metodo: input.metodo,
+      riferimento_tipo: 'fattura_acquisto',
+      riferimento_id: input.fattura_acquisto_id,
+    }]);
+    if (e2) throw e2;
+  }
+
+  // Elenco pagamenti per fattura di acquisto
+  async getPagamentiFornitoriByFattura(fatturaId: number): Promise<Array<{ id: number; data_pagamento: string; importo: number; metodo: string; note?: string }>> {
+    const { data, error } = await supabase
+      .from('pagamenti_fornitori')
+      .select('id, data_pagamento, importo, metodo, note')
+      .eq('fattura_acquisto_id', fatturaId)
+      .order('data_pagamento', { ascending: false });
+    if (error) throw error;
+    return (data as any[]) || [];
+  }
+
+  // Annulla pagamento con contromovimento in cassa
+  async annullaPagamentoFornitore(pagamentoId: number): Promise<void> {
+    // 1) recupera il pagamento
+    const { data: pagamento, error: errSel } = await supabase
+      .from('pagamenti_fornitori')
+      .select('id, fattura_acquisto_id, data_pagamento, importo, metodo, note')
+      .eq('id', pagamentoId)
+      .single();
+    if (errSel) throw errSel;
+    if (!pagamento) return;
+    // 2) elimina il pagamento
+    const { error: errDel } = await supabase
+      .from('pagamenti_fornitori')
+      .delete()
+      .eq('id', pagamentoId);
+    if (errDel) throw errDel;
+    // 3) contromovimento in cassa (entrata)
+    const causale = `Storno pagamento fornitore fattura ${pagamento.fattura_acquisto_id}`;
+    const { error: errCassa } = await supabase.from('registro_cassa').insert([{
+      data_operazione: pagamento.data_pagamento,
+      causale,
+      tipo: 'entrata',
+      importo: pagamento.importo,
+      metodo: pagamento.metodo,
+      riferimento_tipo: 'fattura_acquisto',
+      riferimento_id: pagamento.fattura_acquisto_id,
+    }]);
+    if (errCassa) throw errCassa;
   }
 
   async createFatturaAcquisto(fattura: any): Promise<any> {
@@ -3702,6 +4043,17 @@ class ApiService {
     
     if (error) throw error;
     return data || [];
+  }
+
+  // === WEBSHOP SETTINGS ===
+  async getWebshopSettings(): Promise<{ id: number; is_online: boolean; base_url?: string | null; allow_guest: boolean; listino_default: 'L1'|'L2'|'L3'; homepage_banner?: string | null; theme_primary: string }> {
+    const { data, error } = await supabase.from('webshop_settings').select('*').eq('id', 1).single();
+    if (error) throw error;
+    return data as any;
+  }
+  async updateWebshopSettings(payload: Partial<{ is_online: boolean; base_url?: string | null; allow_guest: boolean; listino_default: 'L1'|'L2'|'L3'; homepage_banner?: string | null; theme_primary: string }>): Promise<void> {
+    const { error } = await supabase.from('webshop_settings').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', 1);
+    if (error) throw error;
   }
 
   /**

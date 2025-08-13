@@ -791,18 +791,10 @@ const GiacenzeMagazzino: React.FC = () => {
                 fontWeight: 700, 
                 color: modernColors.text,
                 fontSize: '0.875rem',
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                whiteSpace: 'nowrap'
               }}>
-                <Box>
-                  Costo/Stelo
-                  <Typography variant="caption" sx={{ 
-                    display: 'block',
-                    color: modernColors.textSecondary,
-                    fontSize: '0.7rem'
-                  }}>
-                    (con costi spalmati)
-                  </Typography>
-                </Box>
+                Costo/Stelo <Typography component="span" variant="caption" sx={{ color: modernColors.textSecondary, ml: 0.5 }}>(spalm.)</Typography>
               </TableCell>
               <TableCell sx={{ 
                 fontWeight: 700, 
@@ -816,18 +808,10 @@ const GiacenzeMagazzino: React.FC = () => {
                 fontWeight: 700, 
                 color: modernColors.text,
                 fontSize: '0.875rem',
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                whiteSpace: 'nowrap'
               }}>
-                <Box>
-                  Margine
-                  <Typography variant="caption" sx={{ 
-                    display: 'block',
-                    color: modernColors.textSecondary,
-                    fontSize: '0.7rem'
-                  }}>
-                    (prezzo 1)
-                  </Typography>
-                </Box>
+                Margine <Typography component="span" variant="caption" sx={{ color: modernColors.textSecondary, ml: 0.5 }}>(prezzo 1)</Typography>
               </TableCell>
               <TableCell sx={{ 
                 fontWeight: 700, 
@@ -873,35 +857,32 @@ const GiacenzeMagazzino: React.FC = () => {
           </TableHead>
           <TableBody>
             {giacenzeFiltrate.map((giacenza) => (
-              <TableRow key={giacenza.carico_id}>
+              <TableRow key={giacenza.carico_id} sx={{ '& td': { py: 0.75 } }}>
                 <TableCell>
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {giacenza.gruppo_nome} - {giacenza.prodotto_nome}
-                    </Typography>
-                    <Typography variant="caption" color="grey.600">
-                      {giacenza.colore_nome} • {giacenza.provenienza_nome} • {giacenza.altezza_cm}cm • {giacenza.imballo_nome}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                      <span style={{ fontSize: '0.9em', marginRight: '4px' }}>
-                        {getQualitaIcon(giacenza.qualita_nome)}
-                      </span>
-                      <Chip 
-                        label={giacenza.qualita_nome}
-                        size="small"
-                        sx={{ 
-                          bgcolor: getQualitaColor(giacenza.qualita_nome),
-                          color: 'white',
-                          fontWeight: 'bold',
-                          fontSize: '0.7rem',
-                          height: '20px'
-                        }}
-                      />
+                  <Box sx={{ display:'flex', alignItems:'center', gap: 1.25 }}>
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.1 }}>
+                        {giacenza.gruppo_nome} - {giacenza.prodotto_nome}
+                      </Typography>
+                      <Typography variant="caption" color="grey.600" sx={{ lineHeight: 1 }}>
+                        {giacenza.colore_nome} • {giacenza.provenienza_nome} • {giacenza.altezza_cm}cm • {giacenza.imballo_nome}
+                      </Typography>
                     </Box>
+                    <Chip 
+                      label={giacenza.qualita_nome}
+                      size="small"
+                      sx={{ 
+                        bgcolor: getQualitaColor(giacenza.qualita_nome),
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: '0.7rem',
+                        height: 18
+                      }}
+                    />
                   </Box>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2">
+                  <Typography variant="body2" sx={{ lineHeight: 1.2 }}>
                     {giacenza.fornitore_nome}
                   </Typography>
                 </TableCell>
@@ -983,40 +964,16 @@ const GiacenzeMagazzino: React.FC = () => {
                   />
                 </TableCell>
                 <TableCell>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="primary"
-                      startIcon={<EditIcon />}
-                      onClick={() => apriDialogModificaImballo(giacenza)}
-                      disabled={giacenza.tipo === 'virtuale'}
-                      sx={{ minWidth: 'auto', px: 1 }}
-                    >
-                      Imballo
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="info"
-                      startIcon={<ListAltIcon />}
-                      onClick={() => apriDialogMovimenti(giacenza)}
-                      disabled={giacenza.tipo === 'virtuale'}
-                      sx={{ minWidth: 'auto', px: 1 }}
-                    >
-                      Dettagli
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={() => apriDialogDistruzione(giacenza)}
-                      disabled={giacenza.tipo === 'virtuale'}
-                      sx={{ minWidth: 'auto', px: 1 }}
-                    >
-                      Distruggi
-                    </Button>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <IconButton size="small" color="primary" onClick={() => apriDialogModificaImballo(giacenza)} disabled={giacenza.tipo === 'virtuale'}>
+                      <EditIcon fontSize="inherit" />
+                    </IconButton>
+                    <IconButton size="small" color="info" onClick={() => apriDialogMovimenti(giacenza)} disabled={giacenza.tipo === 'virtuale'}>
+                      <ListAltIcon fontSize="inherit" />
+                    </IconButton>
+                    <IconButton size="small" color="error" onClick={() => apriDialogDistruzione(giacenza)} disabled={giacenza.tipo === 'virtuale'}>
+                      <DeleteIcon fontSize="inherit" />
+                    </IconButton>
                   </Box>
                 </TableCell>
               </TableRow>

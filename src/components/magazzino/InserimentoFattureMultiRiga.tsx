@@ -15,6 +15,7 @@ import {
   FormControl,
   InputLabel,
   Grid,
+  Stack,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -627,11 +628,10 @@ export default function InserimentoFattureMultiRiga({
       );
     }
 
-    // Filtro per fornitore
+    // Filtro per fornitore (match esatto su valore selezionato in Select)
     if (filtri.fornitore) {
-      risultato = risultato.filter(f => 
-        f.fornitore_nome?.toLowerCase().includes(filtri.fornitore.toLowerCase())
-      );
+      const fx = String(filtri.fornitore).toLowerCase();
+      risultato = risultato.filter(f => (f.fornitore_nome||'').toLowerCase() === fx);
     }
 
     // Filtro per data inizio
@@ -648,21 +648,9 @@ export default function InserimentoFattureMultiRiga({
       );
     }
 
-    // Filtro per stato
-    if (filtri.stato) {
-      risultato = risultato.filter(f => 
-        f.stato_fattura === filtri.stato
-      );
-    }
+    // Stato non rilevante per questa vista: ignorato
 
-    // Filtro per prodotto (cerca negli articoli)
-    if (filtri.prodotto) {
-      risultato = risultato.filter(f => 
-        f.articoli_preview.some(articolo => 
-          articolo?.toLowerCase().includes(filtri.prodotto.toLowerCase())
-        )
-      );
-    }
+    // Filtro prodotto rimosso dalla UI: non applicato
 
     // Ordinamento
     risultato.sort((a, b) => {
@@ -3206,304 +3194,115 @@ export default function InserimentoFattureMultiRiga({
     </Box>
   );
 
-  // NUOVO: Renderizza lista fatture esistenti
-  const renderListaFatture = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
-    >
-      <Paper sx={{ ...modernStyles.glassmorphic, mb: 1 }}>
-        <Box sx={{ p: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <ReceiptIcon sx={{ fontSize: 40, color: '#667eea', mr: 2 }} />
-            <Typography 
-              variant="h5" 
-              sx={{ 
-                fontWeight: 600, 
-                fontSize: '1.4rem',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Documenti di Carico ({fattureFiltrate.length} di {fattureEsistenti.length})
-            </Typography>
+  // NUOVO: Renderizza lista fatture esistenti (compatto, stile vendite)
+  const renderListaFatture = () => {
+    const exportCsv = () => {
+      const headers = ['numero_fattura','data','fornitore','articoli','totale','stato'];
+      const rows = fattureFiltrate.map((f: any) => [
+        f.numero || '',
+        f.data_fattura ? new Date(f.data_fattura).toISOString().slice(0,10) : '',
+        f.fornitore_nome || '',
+        String(f.articoli_count || 0),
+        (f.totale_fattura?.toFixed?.(2) || '0.00'),
+        f.stato_fattura || ''
+      ].join(','));
+      const csv = [headers.join(',')].concat(rows).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'fatture_acquisto.csv'; a.click(); URL.revokeObjectURL(url);
+    };
+
+    return (
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+        <Paper sx={{ ...modernStyles.glassmorphic, mb: 1 }}>
+          <Box sx={{ p: 1.5 }}>
+            <Box sx={{ display:'flex', alignItems:'center', justifyContent:'flex-start', mb: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: modernStyles.colors.text, fontSize:'1rem' }}>
+                Fatture di Acquisto ({fattureFiltrate.length} / {fattureEsistenti.length})
+              </Typography>
+            </Box>
+
+            {/* Filtri compatti inline */}
+            <Box sx={{ display:'flex', gap:1, alignItems:'center', flexWrap:'nowrap', overflowX:'auto', '::-webkit-scrollbar':{ display:'none' }, mb: 1 }}>
+              <TextField size="small" label="Numero" value={filtri.numeroFattura} onChange={(e)=>setFiltri({...filtri, numeroFattura:e.target.value})} sx={{ width: 140 }} />
+              {/* Fornitore da lista */}
+              <FormControl size="small" sx={{ width: 240 }}>
+                <InputLabel>Fornitore</InputLabel>
+                <Select
+                  label="Fornitore"
+                  value={filtri.fornitore}
+                  onChange={(e)=>setFiltri({...filtri, fornitore:String(e.target.value)})}
+                >
+                  <MenuItem value=""><em>Tutti</em></MenuItem>
+                  {fornitori.map((f:any)=> (
+                    <MenuItem key={f.id} value={(f.ragione_sociale||f.nome||'').toLowerCase()}>
+                      {f.ragione_sociale || f.nome}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField size="small" type="date" label="Da" value={filtri.dataInizio} onChange={(e)=>setFiltri({...filtri, dataInizio:e.target.value})} InputLabelProps={{ shrink:true }} sx={{ width: 150 }} />
+              <TextField size="small" type="date" label="A" value={filtri.dataFine} onChange={(e)=>setFiltri({...filtri, dataFine:e.target.value})} InputLabelProps={{ shrink:true }} sx={{ width: 150 }} />
+              {/* Stato non rilevante qui: rimosso dai filtri UI */}
+              <FormControl size="small" sx={{ width: 190 }}>
+                <InputLabel>Ordina</InputLabel>
+                <Select label="Ordina" value={`${ordinamento.campo}-${ordinamento.direzione}`} onChange={(e)=>{ const [campo,direzione]=String(e.target.value).split('-'); setOrdinamento({ campo, direzione: direzione as 'asc'|'desc' }); }}>
+                  <MenuItem value="data-desc">Data (recente)</MenuItem>
+                  <MenuItem value="data-asc">Data (vecchia)</MenuItem>
+                  <MenuItem value="numero_fattura-asc">Numero (A-Z)</MenuItem>
+                  <MenuItem value="numero_fattura-desc">Numero (Z-A)</MenuItem>
+                  <MenuItem value="totale-desc">Importo (maggiore)</MenuItem>
+                  <MenuItem value="totale-asc">Importo (minore)</MenuItem>
+                </Select>
+              </FormControl>
+              {/* Pulsanti azione inline */}
+              <Button size="small" variant="outlined" onClick={resetFiltri} sx={{ borderRadius: 0, whiteSpace:'nowrap' }}>Reset</Button>
+              <Button size="small" variant="outlined" onClick={loadData} sx={{ borderRadius: 0, whiteSpace:'nowrap' }}>Aggiorna</Button>
+              <Button size="small" variant="outlined" onClick={exportCsv} sx={{ borderRadius: 0, whiteSpace:'nowrap' }}>Export CSV</Button>
+            </Box>
+
+            {fattureFiltrate.length === 0 ? (
+              <Alert severity="info" sx={{ borderRadius: '8px' }}>Nessun documento trovato</Alert>
+            ) : (
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Numero</TableCell>
+                    <TableCell>Data</TableCell>
+                    <TableCell>Fornitore</TableCell>
+                    <TableCell>Articoli</TableCell>
+                    <TableCell align="right">Totale</TableCell>
+                    {/* Stato nascosto in questa vista */}
+                    <TableCell align="right">Azioni</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {fattureFiltrate.map((fattura: any, idx: number) => (
+                    <TableRow key={fattura.id || idx} hover>
+                      <TableCell>{fattura.numero || '-'}</TableCell>
+                      <TableCell>{fattura.data_fattura ? new Date(fattura.data_fattura).toLocaleDateString('it-IT') : '-'}</TableCell>
+                      <TableCell>{fattura.fornitore_nome || '-'}</TableCell>
+                      <TableCell>{fattura.articoli_count || 0}</TableCell>
+                      <TableCell align="right">€ {(fattura.totale_fattura?.toFixed?.(2) || '0.00')}</TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          <Button size="small" variant="contained" onClick={()=>handleModificaFattura(fattura)} sx={{ borderRadius: 8, textTransform:'none', fontWeight:700, px:2, py:0.6, background:'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>Modifica</Button>
+                          <IconButton size="small" color="error" onClick={()=>handleEliminaFattura(fattura)}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </Box>
-
-          {/* NUOVO: Sezione Filtri */}
-          <Card sx={{ mb: 1, borderRadius: '10px', backgroundColor: 'rgba(255,255,255,0.9)' }}>
-            <CardContent sx={{ p: 1 }}>
-              <Typography variant="h6" sx={{ mb: 1, color: '#667eea', fontWeight: 600, fontSize: '1.1rem' }}>
-                <FilterIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Filtri di Ricerca
-              </Typography>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    fullWidth
-                    label="📋 Numero Fattura"
-                    value={filtri.numeroFattura}
-                    onChange={(e) => setFiltri({...filtri, numeroFattura: e.target.value})}
-                    sx={modernStyles.modernInput}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    fullWidth
-                    label="🏢 Fornitore"
-                    value={filtri.fornitore}
-                    onChange={(e) => setFiltri({...filtri, fornitore: e.target.value})}
-                    sx={modernStyles.modernInput}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={2}>
-                  <TextField
-                    fullWidth
-                    label="📅 Data Inizio"
-                    type="date"
-                    value={filtri.dataInizio}
-                    onChange={(e) => setFiltri({...filtri, dataInizio: e.target.value})}
-                    InputLabelProps={{ shrink: true }}
-                    sx={modernStyles.modernInput}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={2}>
-                  <TextField
-                    fullWidth
-                    label="📅 Data Fine"
-                    type="date"
-                    value={filtri.dataFine}
-                    onChange={(e) => setFiltri({...filtri, dataFine: e.target.value})}
-                    InputLabelProps={{ shrink: true }}
-                    sx={modernStyles.modernInput}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={2}>
-                  <FormControl fullWidth sx={modernStyles.modernInput}>
-                    <InputLabel>📊 Stato</InputLabel>
-                    <Select
-                      value={filtri.stato}
-                      onChange={(e) => setFiltri({...filtri, stato: e.target.value})}
-                      label="📊 Stato"
-                    >
-                      <MenuItem value="">Tutti</MenuItem>
-                      <MenuItem value="bozza">📝 Bozza</MenuItem>
-                      <MenuItem value="confermata">✅ Confermata</MenuItem>
-                      <MenuItem value="pagata">💰 Pagata</MenuItem>
-                      <MenuItem value="annullata">❌ Annullata</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-              
-              <Grid container spacing={2} sx={{ mt: 1.5 }}>
-                <Grid item xs={12} sm={6} md={4}>
-                  <TextField
-                    fullWidth
-                    label="🌺 Nome Prodotto"
-                    value={filtri.prodotto}
-                    onChange={(e) => setFiltri({...filtri, prodotto: e.target.value})}
-                    sx={modernStyles.modernInput}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={4}>
-                  <Button
-                    variant="outlined"
-                    onClick={resetFiltri}
-                    sx={{
-                      borderRadius: '12px',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      borderColor: '#667eea',
-                      color: '#667eea',
-                      height: '40px'
-                    }}
-                    fullWidth
-                  >
-                    🔄 Reset Filtri
-                  </Button>
-                </Grid>
-                
-                <Grid item xs={12} sm={6} md={4}>
-                  <FormControl fullWidth sx={modernStyles.modernInput}>
-                    <InputLabel>📈 Ordina per</InputLabel>
-                    <Select
-                      value={`${ordinamento.campo}-${ordinamento.direzione}`}
-                      onChange={(e) => {
-                        const [campo, direzione] = e.target.value.split('-');
-                        setOrdinamento({ campo, direzione: direzione as 'asc' | 'desc' });
-                      }}
-                      label="📈 Ordina per"
-                    >
-                      <MenuItem value="data-desc">📅 Data (più recente)</MenuItem>
-                      <MenuItem value="data-asc">📅 Data (più vecchia)</MenuItem>
-                      <MenuItem value="numero_fattura-asc">📋 Numero fattura (A-Z)</MenuItem>
-                      <MenuItem value="numero_fattura-desc">📋 Numero fattura (Z-A)</MenuItem>
-                      <MenuItem value="totale-desc">💰 Importo (maggiore)</MenuItem>
-                      <MenuItem value="totale-asc">💰 Importo (minore)</MenuItem>
-                      <MenuItem value="fornitore-asc">🏢 Fornitore (A-Z)</MenuItem>
-                      <MenuItem value="fornitore-desc">🏢 Fornitore (Z-A)</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-
-          {fattureFiltrate.length === 0 ? (
-            <Alert severity="info" sx={{ borderRadius: '10px' }}>
-              <Typography sx={{ fontWeight: 600 }}>
-                {fattureEsistenti.length === 0 
-                  ? "Nessun documento di carico trovato. Crea il primo documento!" 
-                  : "Nessun documento corrisponde ai filtri selezionati."
-                }
-              </Typography>
-            </Alert>
-          ) : (
-            <Grid container spacing={2}>
-              {fattureFiltrate.map((fattura, index) => (
-                <Grid item xs={12} sm={6} md={4} key={fattura.id || index}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: index * 0.1 }}
-                  >
-                    <Card sx={{
-                      ...modernStyles.articleCard,
-                      height: '100%',
-                      cursor: 'pointer'
-                    }}>
-                      <CardContent sx={{ p: 2 }}>
-                        {/* Header documento */}
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="h6" sx={{ 
-                            fontWeight: 700, 
-                            color: '#2c3e50',
-                            mb: 1
-                          }}>
-                            📋 {fattura.numero || 'N/A'}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            📅 {fattura.data_fattura ? 
-                              new Date(fattura.data_fattura).toLocaleDateString('it-IT') : 'N/A'}
-                          </Typography>
-                        </Box>
-
-                        {/* Dettagli fornitore */}
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            🏢 Fornitore:
-                          </Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {fattura.fornitore_nome || 'N/A'}
-                          </Typography>
-                        </Box>
-
-                        {/* Articoli */}
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            🌺 Articoli:
-                          </Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {fattura.articoli_count || 0} articolo{fattura.articoli_count !== 1 ? 'i' : ''}
-                          </Typography>
-                          <Typography variant="body2" sx={{ 
-                            fontSize: '0.8rem',
-                            fontStyle: 'italic',
-                            color: 'text.secondary'
-                          }}>
-                            {fattura.articoli_preview.slice(0, 2).join(', ')}{fattura.articoli_count > 2 ? '...' : ''}
-                          </Typography>
-                        </Box>
-
-                        {/* Importi */}
-                        <Box sx={{ 
-                          p: 1.5,
-                          borderRadius: '8px',
-                          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-                          border: '1px solid rgba(102, 126, 234, 0.2)',
-                          mb: 2
-                        }}>
-                          <Typography variant="body2" color="text.secondary">
-                            💰 Totale:
-                          </Typography>
-                          <Typography variant="h6" sx={{ 
-                            fontWeight: 600,
-                            fontSize: '1.1rem',
-                            color: '#667eea'
-                          }}>
-                            €{fattura.totale_fattura?.toFixed(2) || '0.00'}
-                          </Typography>
-                        </Box>
-
-                        {/* Stato */}
-                        <Box sx={{ mb: 2 }}>
-                          <Chip 
-                            label={fattura.stato_fattura || 'bozza'}
-                            color={
-                              fattura.stato_fattura === 'confermata' ? 'success' :
-                              fattura.stato_fattura === 'pagata' ? 'primary' :
-                              fattura.stato_fattura === 'annullata' ? 'error' : 'default'
-                            }
-                            sx={{ 
-                              fontWeight: 600,
-                              textTransform: 'capitalize'
-                            }}
-                          />
-                        </Box>
-
-                        {/* Azioni */}
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button
-                            variant="contained"
-                            startIcon={<EditIcon />}
-                            onClick={() => handleModificaFattura(fattura)}
-                            sx={{
-                              ...modernStyles.primaryButton,
-                              flex: 1,
-                              fontSize: '0.875rem',
-                              py: 1
-                            }}
-                          >
-                            Modifica
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            color="error"
-                            startIcon={<DeleteIcon />}
-                            onClick={() => handleEliminaFattura(fattura)}
-                            sx={{
-                              borderRadius: '8px',
-                              textTransform: 'none',
-                              fontWeight: 600,
-                              fontSize: '0.875rem',
-                              py: 0.8,
-                              minWidth: 'auto',
-                              px: 1.5
-                            }}
-                          >
-                            🗑️
-                          </Button>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </Grid>
-              ))}
-            </Grid>
-          )}
-        </Box>
-      </Paper>
-    </motion.div>
-  );
+        </Paper>
+      </motion.div>
+    );
+  };
 
   return (
     <motion.div
@@ -3619,37 +3418,27 @@ export default function InserimentoFattureMultiRiga({
                       whileTap={{ scale: 0.95 }}
                     >
                     <Button
-                      variant={modalitaOrdini ? "contained" : "outlined"}
+                      variant="contained"
                       onClick={toggleModalita}
                       startIcon={modalitaOrdini ? 
-                        <Box sx={{ fontSize: '16px' }}>🛒</Box> : 
-                        <Box sx={{ fontSize: '16px' }}>📋</Box>
+                        <Box sx={{ fontSize: '16px' }}>📋</Box> : 
+                        <Box sx={{ fontSize: '16px' }}>🛒</Box>
                       }
-                  sx={{ 
+                      sx={{ 
                         borderRadius: '25px',
                         padding: '10px 20px',
-                        background: modalitaOrdini ? 
-                          'linear-gradient(45deg, #f59e0b, #fb923c)' : 
-                          'transparent',
-                        border: modalitaOrdini ? 
-                          '2px solid #d97706' : 
-                          '2px solid #3b82f6',
-                        color: modalitaOrdini ? 'white' : '#3b82f6',
+                        background: modalitaOrdini ? 'linear-gradient(45deg, #667eea, #764ba2)' : 'linear-gradient(45deg, #f59e0b, #fb923c)',
+                        border: '2px solid transparent',
+                        color: 'white',
                         fontWeight: 'bold',
                         fontSize: '0.95rem',
                         textTransform: 'none',
                         minWidth: '180px',
-                        boxShadow: modalitaOrdini ? 
-                          '0 4px 15px rgba(245, 158, 11, 0.4)' : 
-                          '0 4px 15px rgba(59, 130, 246, 0.2)',
+                        boxShadow: modalitaOrdini ? '0 4px 15px rgba(102, 126, 234, 0.4)' : '0 4px 15px rgba(245, 158, 11, 0.4)',
                         '&:hover': {
-                          background: modalitaOrdini ? 
-                            'linear-gradient(45deg, #d97706, #ea580c)' : 
-                            'rgba(59, 130, 246, 0.1)',
+                          background: modalitaOrdini ? 'linear-gradient(45deg, #5b6fe5, #6b49a8)' : 'linear-gradient(45deg, #d97706, #ea580c)',
                           transform: 'translateY(-2px)',
-                          boxShadow: modalitaOrdini ? 
-                            '0 6px 20px rgba(245, 158, 11, 0.5)' : 
-                            '0 6px 20px rgba(59, 130, 246, 0.3)',
+                          boxShadow: modalitaOrdini ? '0 6px 20px rgba(102, 126, 234, 0.5)' : '0 6px 20px rgba(245, 158, 11, 0.5)',
                         }
                       }}
                     >
@@ -3674,10 +3463,19 @@ export default function InserimentoFattureMultiRiga({
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={handleOpenDialog}
-                  sx={modernStyles.primaryButton}
-                    size="medium"
+                  size="medium"
+                  sx={{
+                    borderRadius: 1,
+                    px: 3,
+                    py: 1.25,
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    boxShadow: modalitaOrdini ? '0 3px 10px rgba(245, 158, 11, 0.3)' : '0 3px 10px rgba(59, 130, 246, 0.3)',
+                    background: modalitaOrdini ? 'linear-gradient(135deg, #f59e0b 0%, #fb923c 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    '&:hover': { background: modalitaOrdini ? 'linear-gradient(135deg, #d97706 0%, #ea580c 100%)' : 'linear-gradient(135deg, #5b6fe5 0%, #6b49a8 100%)' }
+                  }}
                 >
-                    {modalitaOrdini ? 'Crea Nuovo Ordine' : 'Crea Nuova Fattura'}
+                  {modalitaOrdini ? 'Crea Nuovo Ordine' : 'Crea Nuova Fattura'}
                 </Button>
               </motion.div>
               )}

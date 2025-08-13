@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Tabs, Tab, Typography, Paper } from '@mui/material';
 import CategoryIcon from '@mui/icons-material/Category';
-import BusinessIcon from '@mui/icons-material/Business';
-import PeopleIcon from '@mui/icons-material/People';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import CaratteristicheArticoli from './anagrafica/CaratteristicheArticoli';
-import GestioneFornitori from './anagrafica/GestioneFornitori';
-import GestioneClienti from './anagrafica/GestioneClienti';
+// Clienti e Fornitori sono ora fuori da Anagrafica
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -43,10 +41,25 @@ function a11yProps(index: number) {
 
 export default function Anagrafica() {
   const [value, setValue] = useState(0);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
+
+  // Redirect legacy query params ?tab=clienti / ?tab=fornitori alle nuove pagine
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    const hash = (location.hash || '').replace('#', '').toLowerCase();
+
+    if (tab === 'clienti' || hash === 'clienti') {
+      navigate('/clienti', { replace: true });
+    } else if (tab === 'fornitori' || hash === 'fornitori') {
+      navigate('/fornitori', { replace: true });
+    }
+  }, [location.search, location.hash, navigate]);
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -60,7 +73,7 @@ export default function Anagrafica() {
           borderColor: 'grey.300'
         }}
       >
-        <Box sx={{ borderBottom: 1, borderColor: 'grey.300' }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'grey.300', background: 'linear-gradient(90deg, #111827 0%, #6b7280 100%)10' }}>
           <Tabs 
             value={value} 
             onChange={handleChange} 
@@ -70,21 +83,21 @@ export default function Anagrafica() {
               '& .MuiTabs-indicator': {
                 height: 3,
                 borderRadius: 0,
-                background: '#2196F3',
+                background: '#111827',
               },
               '& .MuiTab-root': {
                 minHeight: 60,
                 textTransform: 'none',
                 fontWeight: 600,
                 fontSize: '0.95rem',
-                color: 'grey.600',
+                color: '#6b7280',
                 '&:hover': {
-                  color: 'primary.main',
-                  background: 'rgba(33, 150, 243, 0.04)',
+                  color: '#111827',
+                  background: 'rgba(17, 24, 39, 0.06)',
                 },
                 '&.Mui-selected': {
-                  color: 'primary.main',
-                  fontWeight: 600,
+                  color: '#111827',
+                  fontWeight: 700,
                 },
               },
             }}
@@ -96,31 +109,21 @@ export default function Anagrafica() {
               {...a11yProps(0)} 
             />
             
-            {/* Sezione Entità Commerciali */}
-            <Tab 
-              icon={<BusinessIcon sx={{ fontSize: 24 }} />} 
-              label="Fornitori" 
-              {...a11yProps(1)} 
-            />
-            <Tab 
-              icon={<PeopleIcon sx={{ fontSize: 24 }} />} 
-              label="Clienti" 
-              {...a11yProps(2)} 
-            />
+            {/* Altre entità spostate in pagine dedicate */}
           </Tabs>
+        </Box>
+
+        {/* Header sezione iOS26 grigio/nero */}
+        <Box sx={{ p: 3, borderBottom: '1px solid', borderColor: 'grey.200', background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#111827', mb: 0.25 }}>Anagrafica</Typography>
+          <Typography variant="body2" sx={{ color: '#6b7280' }}>Gestisci le caratteristiche base degli articoli</Typography>
         </Box>
 
         <TabPanel value={value} index={0}>
           <CaratteristicheArticoli />
         </TabPanel>
         
-        <TabPanel value={value} index={1}>
-          <GestioneFornitori />
-        </TabPanel>
-        
-        <TabPanel value={value} index={2}>
-          <GestioneClienti />
-        </TabPanel>
+        {/* Nessuna tab aggiuntiva: Clienti e Fornitori sono su pagine dedicate */}
       </Paper>
     </Box>
   );
